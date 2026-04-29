@@ -4,7 +4,12 @@
       "PowerShell(Out-Null *)",
       "Bash(npx --yes create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --turbopack --import-alias \"@/*\" --use-npm --yes)",
       "Bash(mv \"/c/Users/Janus/Documents/Proyectos web/geniorama-hosting-web/_prototype-index.html\" \"/c/Users/Janus/Documents/Proyectos web/_prototype-index.html\")",
-      "Bash(mv \"/c/Users/Janus/Documents/Proyectos web/geniorama-hosting-web/_prototype-assets\" \"/c/Users/Janus/Documents/Proyectos web/_prototype-assets\")"
+      "Bash(mv \"/c/Users/Janus/Documents/Proyectos web/geniorama-hosting-web/_prototype-assets\" \"/c/Users/Janus/Documents/Proyectos web/_prototype-assets\")",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(mv \"/c/Users/Janus/Documents/Proyectos web/_prototype-index.html\" \"/c/Users/Janus/Documents/Proyectos web/geniorama-hosting-web/_legacy/index.html\")",
+      "Bash(mv \"/c/Users/Janus/Documents/Proyectos web/_prototype-assets\" \"/c/Users/Janus/Documents/Proyectos web/geniorama-hosting-web/_legacy/assets\")",
+      "WebFetch(domain:developer.paymentsway.co)"
     ]
   }
 }
