@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Out-Null *)",
+      "Bash(npx --yes create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --turbopack --import-alias \"@/*\" --use-npm --yes)",
+      "Bash(mv \"/c/Users/Janus/Documents/Proyectos web/geniorama-hosting-web/_prototype-index.html\" \"/c/Users/Janus/Documents/Proyectos web/_prototype-index.html\")",
+      "Bash(mv \"/c/Users/Janus/Documents/Proyectos web/geniorama-hosting-web/_prototype-assets\" \"/c/Users/Janus/Documents/Proyectos web/_prototype-assets\")"
+    ]
+  }
+}
