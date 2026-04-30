@@ -45,9 +45,12 @@ export const departments = [
   "Vichada",
 ] as const;
 
+export type PaymentProvider = "paymentsway" | "wompi";
+
 export type CheckoutPayload = {
   planId: string;
   billing: "monthly" | "annual";
+  paymentProvider: PaymentProvider;
   contact: {
     firstName: string;
     lastName: string;
@@ -60,14 +63,24 @@ export type CheckoutPayload = {
     docNumber: string;
     dv?: string;
     legalName: string;
+    email: string;
+    phone: string;
     fiscalResponsibility?: string;
     address: string;
     city: string;
     department: string;
     country: string;
   };
+  hosting: {
+    domain: string;
+  };
   notes?: string;
 };
+
+export function isValidDomain(value: string): boolean {
+  const v = value.trim().toLowerCase();
+  return /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.[a-z]{2,})+$/.test(v);
+}
 
 export type CheckoutResult =
   | { ok: true; orderId: string }

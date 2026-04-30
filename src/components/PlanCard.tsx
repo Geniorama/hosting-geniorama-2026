@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Plan } from "@/lib/plans";
 import { formatCOP } from "@/lib/format";
+import { CyberpunkVisual } from "./CyberpunkVisual";
 
 type PlanCardProps = {
   plan: Plan;
@@ -19,7 +20,16 @@ export function PlanCard({ plan, billingMode }: PlanCardProps) {
 
   return (
     <article className={`plan-card${plan.featured ? " is-featured" : ""}`}>
-      {plan.badge && <span className="plan-badge">{plan.badge}</span>}
+      {plan.badge && <span className="plan-badge z-10">{plan.badge}</span>}
+
+      <div className="plan-card-visual">
+        <CyberpunkVisual
+          src={plan.image}
+          alt={`Plan ${plan.name}`}
+          aspect="square"
+          brandCorners={false}
+        />
+      </div>
 
       <div className="plan-head">
         <span className="plan-eyebrow">{plan.eyebrow}</span>
@@ -35,7 +45,7 @@ export function PlanCard({ plan, billingMode }: PlanCardProps) {
         </div>
         {isAnnual ? (
           <div className="plan-price-meta">
-            <span>Total {formatCOP(plan.price.annual)} / año</span>
+            <span className="font-bold text-md text-[#ccc]">Total {formatCOP(plan.price.annual)} / año</span>
             <span className="plan-price-strike">{formatCOP(plan.price.original)}</span>
             <span className="plan-price-save">−{savingsPct}%</span>
           </div>

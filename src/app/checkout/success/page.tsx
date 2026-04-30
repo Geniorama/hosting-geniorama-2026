@@ -48,7 +48,7 @@ export default async function CheckoutSuccessPage({
   searchParams: SearchParams;
 }) {
   const { order: orderId } = await searchParams;
-  const order = orderId ? orderStore.get(orderId) : undefined;
+  const order = orderId ? await orderStore.get(orderId).catch(() => null) : null;
 
   const statusKey =
     order?.status && statusMeta[order.status as keyof typeof statusMeta]

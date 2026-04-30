@@ -4,6 +4,7 @@ import { useState } from "react";
 import { plans } from "@/lib/plans";
 import { categoryStore, useCategory } from "@/lib/category-store";
 import { PlanCard } from "./PlanCard";
+import { PlansCarousel } from "./PlansCarousel";
 
 export function PlansSection() {
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
@@ -67,11 +68,15 @@ export function PlansSection() {
           </div>
         </div>
 
-        <div className={`plans-grid plans-grid--${category}`}>
-          {plans[category].map((plan) => (
-            <PlanCard key={plan.id} plan={plan} billingMode={billing} />
-          ))}
-        </div>
+        {plans[category].length > 3 ? (
+          <PlansCarousel plans={plans[category]} billing={billing} />
+        ) : (
+          <div className={`plans-grid plans-grid--${category}`}>
+            {plans[category].map((plan) => (
+              <PlanCard key={plan.id} plan={plan} billingMode={billing} />
+            ))}
+          </div>
+        )}
 
         <p className="text-muted text-center mt-8 text-sm">
           Todos los precios en pesos colombianos. Servicio exento de IVA. Renovación al mismo

@@ -35,11 +35,17 @@ export async function POST(req: Request) {
   const statusId = payload.idstatus?.id;
   const newStatus = statusMap[statusId] ?? "pending";
 
-  const updated = orderStore.updateStatus(
-    payload.externalorder,
-    newStatus,
-    String(payload.id),
-  );
+  let updated;
+  try {
+    updated = await orderStore.updateStatus(
+      payload.externalorder,
+      newStatus,
+      String(payload.id),
+    );
+  } catch (err) {
+    console.error("[paymentsway:webhook] db error", err);
+    return new NextResponse("DB error", { status: 500 });
+  }
 
   if (!updated) {
     console.warn("[paymentsway:webhook] unknown order", payload.externalorder);

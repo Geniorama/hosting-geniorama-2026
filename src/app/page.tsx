@@ -1,5 +1,6 @@
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
+import { BrandShowcase } from "@/components/BrandShowcase";
 import { PlansSection } from "@/components/PlansSection";
 import { Features } from "@/components/Features";
 import { CompareSection } from "@/components/CompareSection";
@@ -13,6 +14,7 @@ export default function Home() {
       <Header />
       <main>
         <Hero />
+        <BrandShowcase />
         <PlansSection />
         <Features />
         <CompareSection />
