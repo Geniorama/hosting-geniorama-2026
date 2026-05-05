@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { Plan } from "@/lib/plans";
 import { formatCOP } from "@/lib/format";
-import { CyberpunkVisual } from "./CyberpunkVisual";
 
 type PlanCardProps = {
   plan: Plan;
@@ -21,15 +20,6 @@ export function PlanCard({ plan, billingMode }: PlanCardProps) {
   return (
     <article className={`plan-card${plan.featured ? " is-featured" : ""}`}>
       {plan.badge && <span className="plan-badge z-10">{plan.badge}</span>}
-
-      <div className="plan-card-visual">
-        <CyberpunkVisual
-          src={plan.image}
-          alt={`Plan ${plan.name}`}
-          aspect="square"
-          brandCorners={false}
-        />
-      </div>
 
       <div className="plan-head">
         <span className="plan-eyebrow">{plan.eyebrow}</span>

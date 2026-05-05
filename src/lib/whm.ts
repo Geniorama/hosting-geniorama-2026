@@ -144,6 +144,14 @@ export async function provisionIfNeeded(order: Order): Promise<WhmCreateAcctResu
     return null;
   }
 
+  if (order.domainOwnership === "not-yet" || order.payload.hosting.domainOwnership === "not-yet") {
+    console.log(
+      "[whm] order awaiting domain registration, skipping auto-provisioning",
+      order.id,
+    );
+    return null;
+  }
+
   const result = await createCpanelAccount(order);
   if (!result.ok) {
     console.error("[whm] createacct failed", { order: order.id, error: result.error });

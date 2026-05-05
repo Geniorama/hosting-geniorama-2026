@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   type CheckoutPayload,
   type DocType,
@@ -10,10 +10,13 @@ import {
   docTypeOptions,
 } from "@/lib/checkout";
 import { submitCheckout } from "@/app/checkout/actions";
+import { citiesByDepartment } from "@/lib/colombia-cities";
+import { PrivacidadContent, TerminosContent } from "./LegalContent";
 
 type CheckoutFormProps = {
   planId: string;
   billing: "monthly" | "annual";
+  couponCode?: string | null;
 };
 
 const initialState = {
@@ -26,6 +29,8 @@ const initialState = {
   docNumber: "",
   dv: "",
   legalName: "",
+  legalFirstName: "",
+  legalLastName: "",
   billingEmail: "",
   billingPhone: "",
   fiscalResponsibility: "no-responsable" as "responsable" | "no-responsable",
@@ -35,20 +40,41 @@ const initialState = {
   country: "Colombia",
   paymentProvider: "wompi" as PaymentProvider,
   domain: "",
+  domainOwnership: "owned" as "owned" | "not-yet",
   notes: "",
 };
 
-export function CheckoutForm({ planId, billing }: CheckoutFormProps) {
+export function CheckoutForm({ planId, billing, couponCode }: CheckoutFormProps) {
   const [form, setForm] = useState(initialState);
   const [sameAsContact, setSameAsContact] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [redirecting, setRedirecting] = useState<{ orderId: string } | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [legalModal, setLegalModal] = useState<null | "terminos" | "privacidad">(null);
+
+  useEffect(() => {
+    if (!legalModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLegalModal(null);
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [legalModal]);
 
   const syncedLegalName = `${form.firstName} ${form.lastName}`.trim();
+  const naturalLegalName = `${form.legalFirstName} ${form.legalLastName}`.trim();
   const effectiveLegalName =
-    sameAsContact && form.personType === "natural" ? syncedLegalName : form.legalName;
+    form.personType === "natural"
+      ? sameAsContact
+        ? syncedLegalName
+        : naturalLegalName
+      : form.legalName;
   const effectiveBillingEmail = sameAsContact ? form.email : form.billingEmail;
   const effectiveBillingPhone = sameAsContact ? form.phone : form.billingPhone;
 
@@ -69,7 +95,11 @@ export function CheckoutForm({ planId, billing }: CheckoutFormProps) {
         const out = { ...e };
         delete out.billingEmail;
         delete out.billingPhone;
-        if (form.personType === "natural") delete out.legalName;
+        if (form.personType === "natural") {
+          delete out.legalName;
+          delete out.legalFirstName;
+          delete out.legalLastName;
+        }
         return out;
       });
     }
@@ -93,6 +123,14 @@ export function CheckoutForm({ planId, billing }: CheckoutFormProps) {
         docNumber: form.docNumber,
         dv: form.docType === "NIT" ? form.dv : undefined,
         legalName: effectiveLegalName,
+        legalFirstName:
+          form.personType === "natural"
+            ? (sameAsContact ? form.firstName : form.legalFirstName).trim() || undefined
+            : undefined,
+        legalLastName:
+          form.personType === "natural"
+            ? (sameAsContact ? form.lastName : form.legalLastName).trim() || undefined
+            : undefined,
         email: effectiveBillingEmail,
         phone: effectiveBillingPhone,
         fiscalResponsibility: form.fiscalResponsibility,
@@ -103,8 +141,10 @@ export function CheckoutForm({ planId, billing }: CheckoutFormProps) {
       },
       hosting: {
         domain: form.domain.trim().toLowerCase(),
+        domainOwnership: form.domainOwnership,
       },
       notes: form.notes || undefined,
+      couponCode: couponCode || undefined,
     };
 
     startTransition(async () => {
@@ -305,21 +345,51 @@ export function CheckoutForm({ planId, billing }: CheckoutFormProps) {
           )}
         </div>
 
-        <Field
-          label={form.personType === "juridica" ? "Razón social" : "Nombre completo"}
-          error={errors.legalName}
-          required
-        >
-          <input
-            type="text"
-            className={`field-input${errors.legalName ? " is-error" : ""}`}
-            value={effectiveLegalName}
-            onChange={(e) => set("legalName", e.target.value)}
-            placeholder={form.personType === "juridica" ? "Geniorama SAS" : "Juan Pérez Pérez"}
-            disabled={sameAsContact && form.personType === "natural"}
-            required
-          />
-        </Field>
+        {form.personType === "juridica" ? (
+          <Field label="Razón social" error={errors.legalName} required>
+            <input
+              type="text"
+              className={`field-input${errors.legalName ? " is-error" : ""}`}
+              value={form.legalName}
+              onChange={(e) => set("legalName", e.target.value)}
+              placeholder="Geniorama SAS"
+              required
+            />
+          </Field>
+        ) : (
+          <div className="form-grid form-grid--2">
+            <Field
+              label="Nombres"
+              error={errors.legalFirstName || errors.legalName}
+              required
+            >
+              <input
+                type="text"
+                className={`field-input${
+                  errors.legalFirstName || errors.legalName ? " is-error" : ""
+                }`}
+                value={sameAsContact ? form.firstName : form.legalFirstName}
+                onChange={(e) => set("legalFirstName", e.target.value)}
+                placeholder="Juan"
+                autoComplete="given-name"
+                disabled={sameAsContact}
+                required
+              />
+            </Field>
+            <Field label="Apellidos" error={errors.legalLastName} required>
+              <input
+                type="text"
+                className={`field-input${errors.legalLastName ? " is-error" : ""}`}
+                value={sameAsContact ? form.lastName : form.legalLastName}
+                onChange={(e) => set("legalLastName", e.target.value)}
+                placeholder="Pérez Pérez"
+                autoComplete="family-name"
+                disabled={sameAsContact}
+                required
+              />
+            </Field>
+          </div>
+        )}
 
         <div className="form-grid form-grid--2">
           <Field
@@ -404,7 +474,17 @@ export function CheckoutForm({ planId, billing }: CheckoutFormProps) {
             <select
               className={`field-select${errors.department ? " is-error" : ""}`}
               value={form.department}
-              onChange={(e) => set("department", e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value;
+                setForm((f) => ({ ...f, department: next, city: "" }));
+                setErrors((er) => {
+                  if (!er.department && !er.city) return er;
+                  const out = { ...er };
+                  delete out.department;
+                  delete out.city;
+                  return out;
+                });
+              }}
               required
             >
               <option value="">Selecciona…</option>
@@ -416,15 +496,22 @@ export function CheckoutForm({ planId, billing }: CheckoutFormProps) {
             </select>
           </Field>
           <Field label="Ciudad" error={errors.city} required>
-            <input
-              type="text"
-              className={`field-input${errors.city ? " is-error" : ""}`}
+            <select
+              className={`field-select${errors.city ? " is-error" : ""}`}
               value={form.city}
               onChange={(e) => set("city", e.target.value)}
-              placeholder="Bogotá"
-              autoComplete="address-level2"
+              disabled={!form.department}
               required
-            />
+            >
+              <option value="">
+                {form.department ? "Selecciona…" : "Elige un departamento primero"}
+              </option>
+              {(citiesByDepartment[form.department] ?? []).map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
           </Field>
         </div>
       </section>
@@ -436,10 +523,51 @@ export function CheckoutForm({ planId, billing }: CheckoutFormProps) {
           Dominio
         </h2>
 
+        <Field label="¿Ya adquiriste este dominio?" required>
+          <div className="domain-ownership">
+            <button
+              type="button"
+              className={`domain-ownership-option${
+                form.domainOwnership === "owned" ? " is-selected" : ""
+              }`}
+              onClick={() => set("domainOwnership", "owned")}
+              aria-pressed={form.domainOwnership === "owned"}
+            >
+              <span className="domain-ownership-radio" aria-hidden="true">
+                <span />
+              </span>
+              <span>
+                <strong>Sí, ya lo tengo</strong>
+                <small>Activamos tu hosting de inmediato</small>
+              </span>
+            </button>
+            <button
+              type="button"
+              className={`domain-ownership-option${
+                form.domainOwnership === "not-yet" ? " is-selected" : ""
+              }`}
+              onClick={() => set("domainOwnership", "not-yet")}
+              aria-pressed={form.domainOwnership === "not-yet"}
+            >
+              <span className="domain-ownership-radio" aria-hidden="true">
+                <span />
+              </span>
+              <span>
+                <strong>Aún no</strong>
+                <small>Lo registraré después</small>
+              </span>
+            </button>
+          </div>
+        </Field>
+
         <Field
-          label="Dominio principal del sitio"
+          label={
+            form.domainOwnership === "owned"
+              ? "Dominio principal del sitio"
+              : "Dominio que planeas usar (opcional)"
+          }
           error={errors.domain}
-          required
+          required={form.domainOwnership === "owned"}
         >
           <input
             type="text"
@@ -450,13 +578,26 @@ export function CheckoutForm({ planId, billing }: CheckoutFormProps) {
             autoCapitalize="off"
             autoCorrect="off"
             spellCheck={false}
-            required
+            required={form.domainOwnership === "owned"}
           />
         </Field>
-        <p className="text-muted" style={{ fontSize: "0.8rem", margin: "-0.4rem 0 0" }}>
-          Sin <code>http://</code> ni <code>www.</code>. Crearemos tu cuenta cPanel apuntando a
-          este dominio.
-        </p>
+
+        {form.domainOwnership === "owned" ? (
+          <p className="text-muted" style={{ fontSize: "0.8rem", margin: "-0.4rem 0 0" }}>
+            Sin <code>http://</code> ni <code>www.</code>. Crearemos tu cuenta cPanel apuntando a
+            este dominio.
+          </p>
+        ) : (
+          <div className="domain-ownership-note">
+            <strong>Tu hosting quedará reservado</strong>
+            <p>
+              Para activar tu cuenta cPanel necesitamos que el dominio esté registrado a tu
+              nombre y apuntado a nuestros servidores. Recibirás el pedido y un correo con los
+              pasos para registrar el dominio; en cuanto nos confirmes, activamos el servicio
+              sin cargo adicional.
+            </p>
+          </div>
+        )}
       </section>
 
       {/* ── MÉTODO DE PAGO ── */}
@@ -509,13 +650,21 @@ export function CheckoutForm({ planId, billing }: CheckoutFormProps) {
       <div className="checkout-form-footer">
         <p className="text-muted" style={{ fontSize: "0.82rem", margin: 0 }}>
           Al continuar aceptas nuestros{" "}
-          <a href="#" className="text-pink">
+          <button
+            type="button"
+            className="legal-link"
+            onClick={() => setLegalModal("terminos")}
+          >
             términos
-          </a>{" "}
+          </button>{" "}
           y{" "}
-          <a href="#" className="text-pink">
+          <button
+            type="button"
+            className="legal-link"
+            onClick={() => setLegalModal("privacidad")}
+          >
             política de privacidad
-          </a>
+          </button>
           .
         </p>
         <button
@@ -540,6 +689,48 @@ export function CheckoutForm({ planId, billing }: CheckoutFormProps) {
           )}
         </button>
       </div>
+
+      {legalModal && (
+        <div
+          className="legal-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="legal-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setLegalModal(null);
+          }}
+        >
+          <div className="legal-modal">
+            <header className="legal-modal-head">
+              <h2 id="legal-modal-title" className="legal-modal-title">
+                {legalModal === "terminos" ? "Términos y condiciones" : "Política de privacidad"}
+              </h2>
+              <button
+                type="button"
+                className="legal-modal-close"
+                aria-label="Cerrar"
+                onClick={() => setLegalModal(null)}
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </header>
+            <div className="legal-modal-body legal-article">
+              {legalModal === "terminos" ? <TerminosContent /> : <PrivacidadContent />}
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

@@ -2,8 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { CheckoutForm } from "@/components/CheckoutForm";
-import { CheckoutSummary } from "@/components/CheckoutSummary";
+import { CheckoutBody } from "@/components/CheckoutBody";
 import { plans } from "@/lib/plans";
 
 type SearchParams = Promise<{ plan?: string; billing?: string }>;
@@ -57,10 +56,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Sea
             </p>
           </div>
 
-          <div className="checkout-grid">
-            <CheckoutForm planId={plan.id} billing={billingMode} />
-            <CheckoutSummary plan={plan} billing={billingMode} />
-          </div>
+          <CheckoutBody plan={plan} billing={billingMode} />
         </div>
       </main>
       <Footer />

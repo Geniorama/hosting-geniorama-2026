@@ -36,7 +36,7 @@ export async function GET(req: Request) {
         department: "Bogotá D.C.",
         country: "Colombia",
       },
-      hosting: { domain: "ejemplo.com" },
+      hosting: { domain: "ejemplo.com", domainOwnership: "owned" },
     },
   };
 

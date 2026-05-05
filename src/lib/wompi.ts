@@ -58,12 +58,12 @@ const docTypeMap: Record<string, string> = {
 export function buildWompiForm(
   orderId: string,
   payload: CheckoutPayload,
+  amount: number,
 ): { url: string; method: "GET"; fields: WompiFormFields } {
   const allPlans = [...plans.web, ...plans.ads];
   const plan = allPlans.find((p) => p.id === payload.planId);
   if (!plan) throw new Error("Plan not found");
 
-  const amount = payload.billing === "annual" ? plan.price.annual : plan.price.monthly;
   const amountInCents = String(amount * 100);
   const currency = "COP";
   const reference = orderId;

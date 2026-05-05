@@ -13,6 +13,7 @@ export type Plan = {
   featured?: boolean;
   badge?: string;
   image?: string;
+  imagePosition?: string;
   price: {
     monthly: number;
     annual: number;
@@ -62,7 +63,8 @@ export const plans: Record<PlanCategory, Plan[]> = {
       tagline: "El equilibrio ideal entre rendimiento y precio para PYMES.",
       featured: true,
       badge: "Recomendado",
-      image: "/images/plan-standar.jpg",
+      image: "/images/cover-plan-standard.webp",
+      imagePosition: "top",
       price: { monthly: 25000, annual: 240000, original: 300000 },
       features: [
         { strong: "10 GB", text: "almacenamiento SSD" },

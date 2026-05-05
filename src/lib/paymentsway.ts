@@ -67,12 +67,12 @@ const docTypeMap: Record<string, string> = {
 export function buildPaymentForm(
   orderId: string,
   payload: CheckoutPayload,
+  amount: number,
 ): { url: string; fields: PaymentsWayFormFields } {
   const allPlans = [...plans.web, ...plans.ads];
   const plan = allPlans.find((p) => p.id === payload.planId);
   if (!plan) throw new Error("Plan not found");
 
-  const amount = payload.billing === "annual" ? plan.price.annual : plan.price.monthly;
   const description = `Hosting Geniorama — ${plan.name} (${
     payload.billing === "annual" ? "anual" : "mensual"
   })`;

@@ -13,7 +13,11 @@ export function PlansCarousel({ plans, billing }: PlansCarouselProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(true);
-  const [activeIdx, setActiveIdx] = useState(0);
+  const initialIdx = (() => {
+    const featured = plans.findIndex((p) => p.featured);
+    return featured >= 0 ? featured : 0;
+  })();
+  const [activeIdx, setActiveIdx] = useState(initialIdx);
 
   const getStep = () => {
     const el = trackRef.current;
@@ -62,10 +66,25 @@ export function PlansCarousel({ plans, billing }: PlansCarouselProps) {
     };
   }, [plans.length]);
 
-  // Reset scroll when plans (category) change
+  // Snap to the featured plan (or first) when plans (category) change
   useEffect(() => {
-    if (trackRef.current) trackRef.current.scrollLeft = 0;
-    setActiveIdx(0);
+    const el = trackRef.current;
+    if (!el) return;
+    const featured = plans.findIndex((p) => p.featured);
+    const targetIdx = featured >= 0 ? featured : 0;
+
+    const snap = () => {
+      const item = el.querySelector<HTMLElement>("[data-carousel-item]");
+      if (!item) return;
+      const gap = parseFloat(getComputedStyle(el).columnGap || "0") || 16;
+      const step = item.offsetWidth + gap;
+      el.scrollLeft = targetIdx * step;
+      setActiveIdx(targetIdx);
+    };
+
+    snap();
+    const raf = window.requestAnimationFrame(snap);
+    return () => window.cancelAnimationFrame(raf);
   }, [plans]);
 
   return (

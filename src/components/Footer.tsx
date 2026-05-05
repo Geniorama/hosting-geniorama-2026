@@ -48,6 +48,23 @@ export function Footer() {
                   geniorama.co
                 </a>
               </li>
+              <li>
+                <a href="https://app.geniorama.co" target="_blank" rel="noopener noreferrer">
+                  Acceso a clientes
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div className="footer-col">
+            <h4>Legal</h4>
+            <ul>
+              <li>
+                <Link href="/terminos">Términos y condiciones</Link>
+              </li>
+              <li>
+                <Link href="/privacidad">Política de privacidad</Link>
+              </li>
             </ul>
           </div>
         </div>

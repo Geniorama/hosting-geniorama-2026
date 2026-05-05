@@ -31,6 +31,12 @@ export type Order = {
   id: string;
   status: OrderStatus;
   amount: number;
+  subtotal?: number;
+  couponCode?: string;
+  couponDiscount?: number;
+  domainOwnership?: "owned" | "not-yet";
+  legalFirstName?: string;
+  legalLastName?: string;
   payload: CheckoutPayload;
   createdAt: number;
   updatedAt: number;
@@ -44,6 +50,12 @@ type OrderRow = {
   id: string;
   status: OrderStatus;
   amount: number;
+  subtotal: number | null;
+  coupon_code: string | null;
+  coupon_discount: number;
+  domain_ownership: "owned" | "not-yet" | null;
+  legal_first_name: string | null;
+  legal_last_name: string | null;
   payload: CheckoutPayload;
   payment_ref: string | null;
   provisioning: ProvisioningInfo | null;
@@ -57,6 +69,12 @@ const fromRow = (row: OrderRow): Order => ({
   id: row.id,
   status: row.status,
   amount: row.amount,
+  subtotal: row.subtotal ?? undefined,
+  couponCode: row.coupon_code ?? undefined,
+  couponDiscount: row.coupon_discount ?? 0,
+  domainOwnership: row.domain_ownership ?? undefined,
+  legalFirstName: row.legal_first_name ?? undefined,
+  legalLastName: row.legal_last_name ?? undefined,
   payload: row.payload,
   paymentRef: row.payment_ref ?? undefined,
   provisioning: row.provisioning ?? undefined,
@@ -75,6 +93,12 @@ export const orderStore = {
         id: order.id,
         status: order.status,
         amount: order.amount,
+        subtotal: order.subtotal ?? null,
+        coupon_code: order.couponCode ?? null,
+        coupon_discount: order.couponDiscount ?? 0,
+        domain_ownership: order.domainOwnership ?? null,
+        legal_first_name: order.legalFirstName ?? null,
+        legal_last_name: order.legalLastName ?? null,
         payload: order.payload,
         payment_ref: order.paymentRef ?? null,
       })

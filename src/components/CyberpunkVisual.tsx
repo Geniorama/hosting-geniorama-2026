@@ -15,6 +15,7 @@ type CyberpunkVisualProps = {
   scanlines?: boolean;
   priority?: boolean;
   className?: string;
+  objectPosition?: string;
 };
 
 const aspectClass: Record<AspectRatio, string> = {
@@ -32,6 +33,7 @@ export function CyberpunkVisual({
   scanlines = true,
   priority = false,
   className,
+  objectPosition,
 }: CyberpunkVisualProps) {
   const [imgError, setImgError] = useState(false);
   const showImage = src && !imgError;
@@ -46,6 +48,7 @@ export function CyberpunkVisual({
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 600px"
             className="cyber-visual-img"
+            style={objectPosition ? { objectPosition } : undefined}
             priority={priority}
             onError={() => setImgError(true)}
           />

@@ -43,7 +43,7 @@ export async function GET(req: Request) {
         department: "Bogotá D.C.",
         country: "Colombia",
       },
-      hosting: { domain: "fallido.com" },
+      hosting: { domain: "fallido.com", domainOwnership: "owned" },
     },
   };
 

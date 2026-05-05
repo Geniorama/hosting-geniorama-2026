@@ -48,7 +48,7 @@ export async function GET(req: Request) {
         department: "Bogotá D.C.",
         country: "Colombia",
       },
-      hosting: { domain: domain.trim().toLowerCase() },
+      hosting: { domain: domain.trim().toLowerCase(), domainOwnership: "owned" },
     },
   };
 

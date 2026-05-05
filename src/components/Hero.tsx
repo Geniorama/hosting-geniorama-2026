@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link";
-import { CyberpunkVisual } from "./CyberpunkVisual";
 
 export function Hero() {
   const currentYear = new Date().getFullYear().toString();
@@ -20,7 +19,7 @@ export function Hero() {
             <span className="accent">siempre online.</span>
           </h1>
           <p className="hero-subtitle">
-            Hosting SSD con cPanel, soporte humano y planes pensados para WordPress, e-commerce y
+            Hosting SSD con cPanel, asistencia 24/7 y planes pensados para WordPress, e-commerce y
             campañas publicitarias. Pesos colombianos, sin sorpresas.
           </p>
           <div className="hero-actions">
@@ -43,15 +42,6 @@ export function Hero() {
               Comparar planes
             </Link>
           </div>
-        </div>
-
-        <div className="hero-visual">
-          <CyberpunkVisual
-            src="/images/hero-genio.jpg"
-            alt="Hosting Geniorama — para genios como tú"
-            aspect="portrait"
-            priority
-          />
         </div>
       </div>
 

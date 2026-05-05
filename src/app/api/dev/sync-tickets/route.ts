@@ -39,7 +39,7 @@ export async function GET(req: Request) {
         department: "Bogotá D.C.",
         country: "Colombia",
       },
-      hosting: { domain },
+      hosting: { domain, domainOwnership: "owned" },
     },
   };
 

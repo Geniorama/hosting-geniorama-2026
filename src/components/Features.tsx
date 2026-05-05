@@ -65,8 +65,8 @@ const features: Feature[] = [
     ),
   },
   {
-    title: "Soporte humano",
-    desc: "Resolvemos tus dudas por WhatsApp y correo. Sin chatbots ni tickets que se pierden.",
+    title: "Asistencia 24/7",
+    desc: "Sistema de tickets y agentes de IA que responden al instante, con escalamiento al equipo cuando hace falta.",
     icon: (
       <svg
         width="22"

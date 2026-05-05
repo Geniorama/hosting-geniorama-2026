@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Barlow, Barlow_Condensed } from "next/font/google";
+import "lenis/dist/lenis.css";
 import "./globals.css";
+import { SmoothScroll } from "@/components/SmoothScroll";
 
 const barlow = Barlow({
   variable: "--font-barlow",
@@ -19,10 +21,10 @@ const barlowCondensed = Barlow_Condensed({
 export const metadata: Metadata = {
   title: "Hosting Geniorama — Hosting profesional para tu sitio web",
   description:
-    "Planes de hosting SSD optimizados para WordPress, e-commerce y campañas publicitarias. Soporte humano y precios en pesos colombianos.",
+    "Planes de hosting SSD optimizados para WordPress, e-commerce y campañas publicitarias. Asistencia 24/7 con tickets y agentes de IA, precios en pesos colombianos.",
   openGraph: {
     title: "Hosting Geniorama",
-    description: "Hosting profesional con cPanel, SSD y soporte humano. Desde $15.000/mes.",
+    description: "Hosting profesional con cPanel, SSD y asistencia 24/7. Desde $15.000/mes.",
     type: "website",
   },
 };
@@ -34,7 +36,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${barlow.variable} ${barlowCondensed.variable}`}>
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        <SmoothScroll />
+        {children}
+      </body>
     </html>
   );
 }

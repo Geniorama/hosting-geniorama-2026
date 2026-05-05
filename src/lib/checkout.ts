@@ -63,6 +63,8 @@ export type CheckoutPayload = {
     docNumber: string;
     dv?: string;
     legalName: string;
+    legalFirstName?: string;
+    legalLastName?: string;
     email: string;
     phone: string;
     fiscalResponsibility?: string;
@@ -73,8 +75,10 @@ export type CheckoutPayload = {
   };
   hosting: {
     domain: string;
+    domainOwnership: "owned" | "not-yet";
   };
   notes?: string;
+  couponCode?: string;
 };
 
 export function isValidDomain(value: string): boolean {
