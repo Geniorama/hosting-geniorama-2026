@@ -63,6 +63,16 @@ export async function sendCpanelCredentials(
             }
           </table>
 
+          <div style="margin:8px 0 20px;padding:14px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;">
+            <div style="font-size:13px;font-weight:700;color:#9a3412;margin-bottom:6px;">⚠ ¿Tu dominio ya apunta a nuestros servidores?</div>
+            <p style="margin:0 0 8px;font-size:13px;line-height:1.55;color:#7c2d12;">El acceso por <strong>${escape(cpanelUrl)}</strong> sólo funciona cuando tu dominio resuelve a nuestro servidor. Si aún no configuraste los <em>nameservers</em> (siguiente sección) o la propagación DNS no ha terminado, no podrás iniciar sesión por esa URL todavía.</p>
+            ${
+              acct.ip
+                ? `<p style="margin:0;font-size:13px;line-height:1.55;color:#7c2d12;">Mientras tanto puedes ingresar por la IP del servidor: <a href="https://${escape(acct.ip)}:2083" style="font-family:Consolas,Monaco,monospace;color:#0b1a6a;font-weight:700;">https://${escape(acct.ip)}:2083</a>. Tu navegador mostrará una advertencia de certificado — es normal, continúa con la opción "Avanzado → Continuar de todos modos".</p>`
+                : `<p style="margin:0;font-size:13px;line-height:1.55;color:#7c2d12;">Espera a que la propagación DNS termine (entre 15 minutos y 24 horas) antes de intentar ingresar.</p>`
+            }
+          </div>
+
           <h3 style="font-size:15px;margin:24px 0 8px;color:#0b1a6a;">Apunta tu dominio al servidor</h3>
           <p style="margin:0 0 12px;font-size:14px;line-height:1.55;color:#3a3f59;">Si compraste tu dominio aparte, ingresa al panel de tu registrador y configura estos <strong>nameservers</strong>:</p>
 
@@ -108,6 +118,17 @@ export async function sendCpanelCredentials(
     `Webmail: ${webmailUrl}`,
     acct.ip ? `IP del servidor: ${acct.ip}` : "",
     ``,
+    `IMPORTANTE: el acceso por ${cpanelUrl} sólo funciona cuando tu dominio`,
+    `apunta a nuestros servidores. Si aún no configuraste los nameservers`,
+    `(ver abajo) o la propagación DNS no ha terminado, no podrás iniciar`,
+    `sesión por esa URL todavía.`,
+    acct.ip
+      ? `Mientras tanto puedes entrar por IP: https://${acct.ip}:2083 (el navegador`
+      : "",
+    acct.ip
+      ? `mostrará una advertencia de certificado — es normal, continúa de todos modos).`
+      : "",
+    ``,
     `Nameservers para apuntar tu dominio:`,
     `  ${ns1}`,
     `  ${ns2}`,
@@ -147,7 +168,7 @@ function getOpsRecipients(): string[] {
   const raw =
     process.env.MAIL_OPS_ALERT ??
     process.env.MAIL_BCC ??
-    "soporte@geniorama.co";
+    "soporte@geniorama.site";
   return raw
     .split(",")
     .map((s) => s.trim())
