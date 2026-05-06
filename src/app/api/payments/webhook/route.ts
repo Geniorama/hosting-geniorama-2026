@@ -5,6 +5,7 @@ import {
   verifyWebhookChecksum,
 } from "@/lib/paymentsway";
 import { orderStore, type OrderStatus } from "@/lib/order-store";
+import { provisionIfNeeded } from "@/lib/whm";
 
 const statusMap: Record<number, OrderStatus> = {
   [PaymentsWayStatus.SUCCESS]: "success",
@@ -55,6 +56,14 @@ export async function POST(req: Request) {
       status: newStatus,
       paymentRef: String(payload.id),
     });
+
+    if (newStatus === "success") {
+      try {
+        await provisionIfNeeded(updated);
+      } catch (err) {
+        console.error("[paymentsway:webhook] provision error", err);
+      }
+    }
   }
 
   // PaymentsWay expects 200 only for successful (status 34), 201 for everything else
