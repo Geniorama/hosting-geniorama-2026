@@ -1509,6 +1509,13 @@ body {
   background: rgba(11, 26, 106, 0.15);
 }
 
+.payment-method-description {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--color-text-soft);
+  margin-top: 0.35rem;
+}
+
 .payment-method-brands {
   display: flex;
   flex-wrap: wrap;

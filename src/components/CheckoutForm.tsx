@@ -38,7 +38,7 @@ const initialState = {
   city: "",
   department: "",
   country: "Colombia",
-  paymentProvider: "wompi" as PaymentProvider,
+  paymentProvider: "paymentsway" as PaymentProvider,
   domain: "",
   domainOwnership: "owned" as "owned" | "not-yet",
   notes: "",
@@ -609,17 +609,12 @@ export function CheckoutForm({ planId, billing, couponCode }: CheckoutFormProps)
 
         <div className="payment-methods">
           <PaymentMethodCard
-            selected={form.paymentProvider === "wompi"}
-            onClick={() => set("paymentProvider", "wompi")}
-            title="Wompi"
-            brands={["visa", "mastercard", "pse", "nequi", "bancolombia"]}
-            badge="Recomendado"
-          />
-          <PaymentMethodCard
             selected={form.paymentProvider === "paymentsway"}
             onClick={() => set("paymentProvider", "paymentsway")}
             title="PaymentsWay"
+            description="Tarjetas de crédito y débito · PSE · BREB"
             brands={["visa", "mastercard", "pse", "breb"]}
+            badge="Recomendado"
           />
         </div>
       </section>
@@ -786,12 +781,14 @@ function PaymentMethodCard({
   selected,
   onClick,
   title,
+  description,
   brands,
   badge,
 }: {
   selected: boolean;
   onClick: () => void;
   title: string;
+  description?: string;
   brands: BrandId[];
   badge?: string;
 }) {
@@ -810,6 +807,9 @@ function PaymentMethodCard({
           {title}
           {badge && <span className="payment-method-badge">{badge}</span>}
         </div>
+        {description && (
+          <div className="payment-method-description">{description}</div>
+        )}
         <div className="payment-method-brands" aria-label="Métodos disponibles">
           {brands.map((b) => (
             <BrandLogo key={b} id={b} />
