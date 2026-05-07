@@ -14,6 +14,34 @@ function planName(planId: string): string {
   return all.find((p) => p.id === planId)?.name ?? planId;
 }
 
+function planFamily(planId: string): "web" | "ads" {
+  return plans.web.some((p) => p.id === planId) ? "web" : "ads";
+}
+
+function billingPeriodLabel(b: "monthly" | "annual"): string {
+  return b === "annual" ? "1 año" : "1 mes";
+}
+
+function formatLongDate(d: Date): string {
+  return d.toLocaleDateString("es-CO", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatValue(n: number): string {
+  return `$${n.toLocaleString("es-CO")}`;
+}
+
+function buildConceptLine(order: Order): string {
+  const family = planFamily(order.payload.planId);
+  const familyLabel = family === "web" ? "Hosting Plan" : "Plan Ads";
+  const period = billingPeriodLabel(order.payload.billing);
+  const until = formatLongDate(computeDueDate(order));
+  return `${familyLabel} ${planName(order.payload.planId)} * ${period}, hasta ${until}. Ref: ${order.id}`;
+}
+
 function fullName(order: Order): string {
   return (
     order.payload.invoice.legalName ||
@@ -49,6 +77,9 @@ function buildCardDescription(order: Order): string {
       : "Persona natural";
 
   return [
+    `**Concepto:** ${buildConceptLine(order)}`,
+    `**Valor:** ${formatValue(order.amount)}`,
+    ``,
     `## 🧾 Datos de facturación`,
     ``,
     `**Razón social:** ${inv.legalName}`,
@@ -141,10 +172,13 @@ export async function createInvoiceCard(order: Order): Promise<TrelloCardResult>
     pos: "top",
   });
 
-  const labelIds = (tryEnv("TRELLO_LABEL_IDS") ?? "")
+  const envLabelIds = (tryEnv("TRELLO_LABEL_IDS") ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  const labelIds = Array.from(
+    new Set([...envLabelIds, "620fafcc607b1e146abad211"]),
+  );
   if (labelIds.length) params.set("idLabels", labelIds.join(","));
 
   const memberIds = (tryEnv("TRELLO_MEMBER_IDS") ?? "")
