@@ -5,19 +5,40 @@ import type { WhmCreateAcctResult } from "./whm";
 const escape = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+export type CredentialsPresentation = {
+  /** Control panel the account lives on. Defaults to "cpanel". */
+  panel?: "cpanel" | "plesk";
+  /** Override nameservers (defaults to HOSTING_NS1/NS2 env or cPanel defaults). */
+  ns1?: string;
+  ns2?: string;
+  /** Override the webmail URL (defaults per panel type). */
+  webmailUrl?: string;
+  /** Whether to include the "point your domain" nameserver section. Defaults to true for cPanel, false for Plesk. */
+  showNameservers?: boolean;
+};
+
 export async function sendCpanelCredentials(
   order: Order,
   acct: Extract<WhmCreateAcctResult, { ok: true }>,
+  opts?: CredentialsPresentation,
 ) {
   const recipientEmail = order.payload.invoice.email || order.payload.contact.email;
   const recipientName =
     order.payload.invoice.legalName ||
     `${order.payload.contact.firstName} ${order.payload.contact.lastName}`.trim();
 
-  const cpanelUrl = `https://${acct.domain}:2083`;
-  const webmailUrl = `https://${acct.domain}:2096`;
-  const ns1 = process.env.HOSTING_NS1 ?? "ns11.bienvenidohosting.com";
-  const ns2 = process.env.HOSTING_NS2 ?? "ns12.bienvenidohosting.com";
+  const isPlesk = (opts?.panel ?? "cpanel") === "plesk";
+  const panelName = isPlesk ? "Plesk" : "cPanel";
+  const panelPort = isPlesk ? "8443" : "2083";
+  const panelUrl = `https://${acct.domain}:${panelPort}`;
+  const ipPanelUrl = acct.ip ? `https://${acct.ip}:${panelPort}` : "";
+  const webmailUrl =
+    opts?.webmailUrl ??
+    (isPlesk ? `https://webmail.${acct.domain}` : `https://${acct.domain}:2096`);
+  const ns1 = opts?.ns1 ?? process.env.HOSTING_NS1 ?? "ns11.bienvenidohosting.com";
+  const ns2 = opts?.ns2 ?? process.env.HOSTING_NS2 ?? "ns12.bienvenidohosting.com";
+  // cPanel shows nameservers by default; Plesk only when explicitly enabled.
+  const showNs = opts?.showNameservers ?? !isPlesk;
 
   const subject = `Tu hosting Geniorama está listo — credenciales para ${acct.domain}`;
 
@@ -34,7 +55,7 @@ export async function sendCpanelCredentials(
         </td></tr>
         <tr><td style="padding:28px 32px;">
           <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">Hola <strong>${escape(recipientName)}</strong>,</p>
-          <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">Confirmamos tu pago y ya creamos tu cuenta cPanel para <strong>${escape(acct.domain)}</strong>. Estos son tus accesos:</p>
+          <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">Confirmamos tu pago y ya creamos tu cuenta ${panelName} para <strong>${escape(acct.domain)}</strong>. Estos son tus accesos:</p>
 
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 20px;background:#f7f8fc;border:1px solid #e3e6f1;border-radius:10px;">
             <tr><td style="padding:14px 18px;border-bottom:1px solid #e3e6f1;">
@@ -46,8 +67,8 @@ export async function sendCpanelCredentials(
               <div style="font-family:Consolas,Monaco,monospace;font-size:16px;font-weight:700;margin-top:4px;">${escape(acct.password)}</div>
             </td></tr>
             <tr><td style="padding:14px 18px;border-bottom:1px solid #e3e6f1;">
-              <div style="font-size:12px;color:#6b7088;text-transform:uppercase;letter-spacing:0.6px;">Acceso cPanel</div>
-              <a href="${cpanelUrl}" style="font-family:Consolas,Monaco,monospace;font-size:14px;font-weight:600;margin-top:4px;color:#0b1a6a;text-decoration:none;display:block;">${cpanelUrl}</a>
+              <div style="font-size:12px;color:#6b7088;text-transform:uppercase;letter-spacing:0.6px;">Acceso ${panelName}</div>
+              <a href="${panelUrl}" style="font-family:Consolas,Monaco,monospace;font-size:14px;font-weight:600;margin-top:4px;color:#0b1a6a;text-decoration:none;display:block;">${panelUrl}</a>
             </td></tr>
             <tr><td style="padding:14px 18px;border-bottom:1px solid #e3e6f1;">
               <div style="font-size:12px;color:#6b7088;text-transform:uppercase;letter-spacing:0.6px;">Webmail</div>
@@ -65,15 +86,17 @@ export async function sendCpanelCredentials(
 
           <div style="margin:8px 0 20px;padding:14px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;">
             <div style="font-size:13px;font-weight:700;color:#9a3412;margin-bottom:6px;">⚠ ¿Tu dominio ya apunta a nuestros servidores?</div>
-            <p style="margin:0 0 8px;font-size:13px;line-height:1.55;color:#7c2d12;">El acceso por <strong>${escape(cpanelUrl)}</strong> sólo funciona cuando tu dominio resuelve a nuestro servidor. Si aún no configuraste los <em>nameservers</em> (siguiente sección) o la propagación DNS no ha terminado, no podrás iniciar sesión por esa URL todavía.</p>
+            <p style="margin:0 0 8px;font-size:13px;line-height:1.55;color:#7c2d12;">El acceso por <strong>${escape(panelUrl)}</strong> sólo funciona cuando tu dominio resuelve a nuestro servidor.${showNs ? " Si aún no configuraste los <em>nameservers</em> (siguiente sección) o la propagación DNS no ha terminado, no podrás iniciar sesión por esa URL todavía." : " Si la propagación DNS aún no ha terminado, usa el acceso por IP de abajo mientras tanto."}</p>
             ${
               acct.ip
-                ? `<p style="margin:0;font-size:13px;line-height:1.55;color:#7c2d12;">Mientras tanto puedes ingresar por la IP del servidor: <a href="https://${escape(acct.ip)}:2083" style="font-family:Consolas,Monaco,monospace;color:#0b1a6a;font-weight:700;">https://${escape(acct.ip)}:2083</a>. Tu navegador mostrará una advertencia de certificado — es normal, continúa con la opción "Avanzado → Continuar de todos modos".</p>`
+                ? `<p style="margin:0;font-size:13px;line-height:1.55;color:#7c2d12;">Mientras tanto puedes ingresar por la IP del servidor: <a href="${ipPanelUrl}" style="font-family:Consolas,Monaco,monospace;color:#0b1a6a;font-weight:700;">${ipPanelUrl}</a>. Tu navegador mostrará una advertencia de certificado — es normal, continúa con la opción "Avanzado → Continuar de todos modos".</p>`
                 : `<p style="margin:0;font-size:13px;line-height:1.55;color:#7c2d12;">Espera a que la propagación DNS termine (entre 15 minutos y 24 horas) antes de intentar ingresar.</p>`
             }
           </div>
 
-          <h3 style="font-size:15px;margin:24px 0 8px;color:#0b1a6a;">Apunta tu dominio al servidor</h3>
+          ${
+            showNs
+              ? `<h3 style="font-size:15px;margin:24px 0 8px;color:#0b1a6a;">Apunta tu dominio al servidor</h3>
           <p style="margin:0 0 12px;font-size:14px;line-height:1.55;color:#3a3f59;">Si compraste tu dominio aparte, ingresa al panel de tu registrador y configura estos <strong>nameservers</strong>:</p>
 
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px;background:#f7f8fc;border:1px solid #e3e6f1;border-radius:10px;">
@@ -87,14 +110,22 @@ export async function sendCpanelCredentials(
             </td></tr>
           </table>
 
-          <p style="margin:0 0 16px;font-size:13px;line-height:1.55;color:#6b7088;">Alternativamente puedes crear un registro A apuntando a la IP de arriba. La propagación DNS toma entre 15 minutos y 24 horas. ¿Necesitas ayuda? Escríbenos a <a href="mailto:soporte@geniorama.co" style="color:#0b1a6a;font-weight:600;">soporte@geniorama.co</a> y te guiamos.</p>
+          <p style="margin:0 0 16px;font-size:13px;line-height:1.55;color:#6b7088;">Alternativamente puedes crear un registro A apuntando a la IP de arriba. La propagación DNS toma entre 15 minutos y 24 horas. ¿Necesitas ayuda? Escríbenos a <a href="mailto:soporte@geniorama.co" style="color:#0b1a6a;font-weight:600;">soporte@geniorama.co</a> y te guiamos.</p>`
+              : `<p style="margin:0 0 16px;font-size:13px;line-height:1.55;color:#6b7088;">Tu dominio ya está apuntando a nuestro servidor. Si necesitas configurarlo en otro dominio, crea un registro A hacia la IP de arriba o escríbenos a <a href="mailto:soporte@geniorama.co" style="color:#0b1a6a;font-weight:600;">soporte@geniorama.co</a> y te guiamos.</p>`
+          }
 
           <h3 style="font-size:15px;margin:24px 0 8px;color:#0b1a6a;">Próximos pasos</h3>
           <ol style="margin:0 0 16px;padding-left:18px;font-size:14px;line-height:1.7;color:#3a3f59;">
-            <li>Ingresa a cPanel con las credenciales de arriba.</li>
-            <li>Cambia tu contraseña en <em>Preferences → Password & Security</em>.</li>
+            <li>Ingresa a ${panelName} con las credenciales de arriba.</li>
+            ${
+              isPlesk
+                ? `<li>Cambia tu contraseña en <em>Mi perfil → Cambiar mi contraseña</em>.</li>
+            <li>Crea cuentas de email en <em>Correo → Crear dirección de correo</em>.</li>
+            <li>Instala WordPress desde <em>WordPress Toolkit</em>.</li>`
+                : `<li>Cambia tu contraseña en <em>Preferences → Password & Security</em>.</li>
             <li>Crea cuentas de email en <em>Email → Email Accounts</em>.</li>
-            <li>Instala WordPress (u otro CMS) desde <em>Softaculous Apps Installer</em>.</li>
+            <li>Instala WordPress (u otro CMS) desde <em>Softaculous Apps Installer</em>.</li>`
+            }
           </ol>
 
           <p style="margin:28px 0 0;font-size:13px;line-height:1.55;color:#6b7088;">Pedido <strong>${escape(order.id)}</strong> · ${new Date().toLocaleDateString("es-CO")}</p>
@@ -110,29 +141,27 @@ export async function sendCpanelCredentials(
   const text = [
     `Hola ${recipientName},`,
     ``,
-    `Tu cuenta cPanel para ${acct.domain} está activa.`,
+    `Tu cuenta ${panelName} para ${acct.domain} está activa.`,
     ``,
     `Usuario: ${acct.username}`,
     `Contraseña: ${acct.password}`,
-    `cPanel: ${cpanelUrl}`,
+    `${panelName}: ${panelUrl}`,
     `Webmail: ${webmailUrl}`,
     acct.ip ? `IP del servidor: ${acct.ip}` : "",
     ``,
-    `IMPORTANTE: el acceso por ${cpanelUrl} sólo funciona cuando tu dominio`,
-    `apunta a nuestros servidores. Si aún no configuraste los nameservers`,
-    `(ver abajo) o la propagación DNS no ha terminado, no podrás iniciar`,
-    `sesión por esa URL todavía.`,
+    `IMPORTANTE: el acceso por ${panelUrl} sólo funciona cuando tu dominio`,
+    `apunta a nuestros servidores.`,
     acct.ip
-      ? `Mientras tanto puedes entrar por IP: https://${acct.ip}:2083 (el navegador`
+      ? `Mientras tanto puedes entrar por IP: ${ipPanelUrl} (el navegador`
       : "",
     acct.ip
       ? `mostrará una advertencia de certificado — es normal, continúa de todos modos).`
       : "",
     ``,
-    `Nameservers para apuntar tu dominio:`,
-    `  ${ns1}`,
-    `  ${ns2}`,
-    ``,
+    showNs ? `Nameservers para apuntar tu dominio:` : "",
+    showNs ? `  ${ns1}` : "",
+    showNs ? `  ${ns2}` : "",
+    showNs ? `` : "",
     `Pedido: ${order.id}`,
     ``,
     `Cambia tu contraseña la primera vez que ingreses.`,

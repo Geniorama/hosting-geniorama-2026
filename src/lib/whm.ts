@@ -4,6 +4,7 @@ import {
   sendCpanelCredentials,
   sendProvisioningDelayedNotice,
   sendProvisioningFailureAlert,
+  type CredentialsPresentation,
 } from "./mail-templates";
 import { syncOrderToTickets } from "./tickets-integration";
 import { createInvoiceCard } from "./trello";
@@ -173,6 +174,30 @@ export async function provisionIfNeeded(order: Order): Promise<WhmCreateAcctResu
     return result;
   }
 
+  await completeProvisioning(order, result);
+
+  return result;
+}
+
+/**
+ * Runs every post-account-creation step (persist provisioning, send
+ * credentials, sync to tickets, create the Trello invoice card) for an order
+ * whose cPanel account already exists.
+ *
+ * `provisionIfNeeded` calls this after creating the account via WHM. It is also
+ * exposed directly so an account created manually in another reseller (e.g.
+ * when the primary reseller is full) can be wired up automatically without
+ * hitting the WHM API — see /api/admin/complete-order.
+ *
+ * Each step is idempotent: tickets sync and the Trello card are skipped when
+ * already recorded on the order.
+ */
+export async function completeProvisioning(
+  order: Order,
+  result: Extract<WhmCreateAcctResult, { ok: true }>,
+  presentation?: CredentialsPresentation,
+  flow?: { skipCredentialsEmail?: boolean },
+): Promise<void> {
   try {
     await orderStore.setProvisioning(order.id, {
       username: result.username,
@@ -191,10 +216,14 @@ export async function provisionIfNeeded(order: Order): Promise<WhmCreateAcctResu
     domain: result.domain,
   });
 
-  try {
-    await sendCpanelCredentials(order, result);
-  } catch (err) {
-    console.error("[whm] credentials email failed", err);
+  if (flow?.skipCredentialsEmail) {
+    console.log("[whm] skipping credentials email (skipCredentialsEmail)", order.id);
+  } else {
+    try {
+      await sendCpanelCredentials(order, result, presentation);
+    } catch (err) {
+      console.error("[whm] credentials email failed", err);
+    }
   }
 
   let orderForNext = order;
@@ -251,7 +280,5 @@ export async function provisionIfNeeded(order: Order): Promise<WhmCreateAcctResu
       console.error("[trello] card creation threw", err);
     }
   }
-
-  return result;
 }
 
