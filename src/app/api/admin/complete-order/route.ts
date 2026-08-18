@@ -152,7 +152,7 @@ export async function POST(req: Request) {
         raw: { source: "manual", reseller: "external", panel },
       },
       { panel, ns1, ns2, webmailUrl, showNameservers },
-      { skipCredentialsEmail: skipEmail },
+      { skipCredentialsEmail: skipEmail, provider: "manual" },
     );
   } catch (err) {
     console.error("[admin:complete] completeProvisioning threw", err);

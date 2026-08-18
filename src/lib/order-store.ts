@@ -1,4 +1,5 @@
 import type { CheckoutPayload } from "./checkout";
+import type { PanelType } from "./hosting-account";
 import { getSupabaseAdmin } from "./supabase";
 
 export type OrderStatus = "created" | "success" | "pending" | "failed" | "cancelled" | "refunded";
@@ -9,6 +10,13 @@ export type ProvisioningInfo = {
   package: string;
   ip?: string;
   provisionedAt: number;
+  /**
+   * Control panel the account lives on. Optional because records written before
+   * the Plesk reseller existed have no value — treat a missing panel as cPanel.
+   */
+  panel?: PanelType;
+  /** Which reseller created it: "whm", "plesk", or "manual". */
+  provider?: string;
 };
 
 export type TicketsSyncInfo = {

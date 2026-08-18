@@ -13,6 +13,8 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const customer = url.searchParams.get("to") ?? "test@example.com";
   const reason = url.searchParams.get("reason") ?? "Sorry, the disk is full";
+  // ?panel=plesk previews the "reseller lleno, créala a mano en Plesk" variant.
+  const manualPanel = url.searchParams.get("panel") === "plesk" ? "plesk" : undefined;
 
   const fakeOrder: Order = {
     id: `DEV-${Date.now().toString(36).toUpperCase()}`,
@@ -48,7 +50,7 @@ export async function GET(req: Request) {
   };
 
   const [alert, notice] = await Promise.all([
-    sendProvisioningFailureAlert(fakeOrder, reason),
+    sendProvisioningFailureAlert(fakeOrder, reason, manualPanel ? { manualPanel } : undefined),
     sendProvisioningDelayedNotice(fakeOrder),
   ]);
 

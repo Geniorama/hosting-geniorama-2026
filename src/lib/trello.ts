@@ -110,8 +110,13 @@ function buildCardDescription(order: Order): string {
     ``,
     order.provisioning
       ? [
-          `**Usuario cPanel:** \`${order.provisioning.username}\``,
-          `**Paquete WHM:** ${order.provisioning.package}`,
+          `**Panel:** ${order.provisioning.panel === "plesk" ? "Plesk" : "cPanel"}${
+            order.provisioning.provider ? ` (${order.provisioning.provider})` : ""
+          }`,
+          `**Usuario:** \`${order.provisioning.username}\``,
+          `**${order.provisioning.panel === "plesk" ? "Service plan" : "Paquete WHM"}:** ${
+            order.provisioning.package
+          }`,
           order.provisioning.ip ? `**IP servidor:** ${order.provisioning.ip}` : "",
         ]
           .filter(Boolean)

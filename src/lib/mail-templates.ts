@@ -1,3 +1,4 @@
+import type { PanelType } from "./hosting-account";
 import { sendMail } from "./mail";
 import type { Order } from "./order-store";
 import type { WhmCreateAcctResult } from "./whm";
@@ -7,7 +8,13 @@ const escape = (s: string) =>
 
 export type CredentialsPresentation = {
   /** Control panel the account lives on. Defaults to "cpanel". */
-  panel?: "cpanel" | "plesk";
+  panel?: PanelType;
+  /**
+   * Override the panel login URL. Worth setting for a Plesk reseller: the
+   * provider's server hostname has a valid certificate and works before the
+   * domain resolves, unlike the default https://<domain>:8443.
+   */
+  panelUrl?: string;
   /** Override nameservers (defaults to HOSTING_NS1/NS2 env or cPanel defaults). */
   ns1?: string;
   ns2?: string;
@@ -30,7 +37,7 @@ export async function sendCpanelCredentials(
   const isPlesk = (opts?.panel ?? "cpanel") === "plesk";
   const panelName = isPlesk ? "Plesk" : "cPanel";
   const panelPort = isPlesk ? "8443" : "2083";
-  const panelUrl = `https://${acct.domain}:${panelPort}`;
+  const panelUrl = opts?.panelUrl ?? `https://${acct.domain}:${panelPort}`;
   const ipPanelUrl = acct.ip ? `https://${acct.ip}:${panelPort}` : "";
   const webmailUrl =
     opts?.webmailUrl ??
@@ -39,6 +46,23 @@ export async function sendCpanelCredentials(
   const ns2 = opts?.ns2 ?? process.env.HOSTING_NS2 ?? "ns12.bienvenidohosting.com";
   // cPanel shows nameservers by default; Plesk only when explicitly enabled.
   const showNs = opts?.showNameservers ?? !isPlesk;
+  // A domain-based panel URL only resolves once DNS points here; an explicit
+  // panelUrl (the reseller's own hostname) works from the first minute.
+  const panelNeedsDns = !opts?.panelUrl;
+
+  const dnsNotice = panelNeedsDns
+    ? `<div style="margin:8px 0 20px;padding:14px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;">
+            <div style="font-size:13px;font-weight:700;color:#9a3412;margin-bottom:6px;">⚠ ¿Tu dominio ya apunta a nuestros servidores?</div>
+            <p style="margin:0 0 8px;font-size:13px;line-height:1.55;color:#7c2d12;">El acceso por <strong>${escape(panelUrl)}</strong> sólo funciona cuando tu dominio resuelve a nuestro servidor.${showNs ? " Si aún no configuraste los <em>nameservers</em> (siguiente sección) o la propagación DNS no ha terminado, no podrás iniciar sesión por esa URL todavía." : " Si la propagación DNS aún no ha terminado, usa el acceso por IP de abajo mientras tanto."}</p>
+            ${
+              acct.ip
+                ? `<p style="margin:0;font-size:13px;line-height:1.55;color:#7c2d12;">Mientras tanto puedes ingresar por la IP del servidor: <a href="${ipPanelUrl}" style="font-family:Consolas,Monaco,monospace;color:#0b1a6a;font-weight:700;">${ipPanelUrl}</a>. Tu navegador mostrará una advertencia de certificado — es normal, continúa con la opción "Avanzado → Continuar de todos modos".</p>`
+                : `<p style="margin:0;font-size:13px;line-height:1.55;color:#7c2d12;">Espera a que la propagación DNS termine (entre 15 minutos y 24 horas) antes de intentar ingresar.</p>`
+            }
+          </div>`
+    : `<div style="margin:8px 0 20px;padding:14px 16px;background:#eef7ff;border:1px solid #bfdcf5;border-radius:10px;">
+            <p style="margin:0;font-size:13px;line-height:1.55;color:#0b3a6a;">Puedes entrar a <strong>${escape(panelUrl)}</strong> de inmediato, sin esperar la propagación DNS.${showNs ? " Tu sitio web, en cambio, sólo responderá cuando el dominio apunte a nuestros servidores (siguiente sección)." : ""}</p>
+          </div>`;
 
   const subject = `Tu hosting Geniorama está listo — credenciales para ${acct.domain}`;
 
@@ -84,15 +108,7 @@ export async function sendCpanelCredentials(
             }
           </table>
 
-          <div style="margin:8px 0 20px;padding:14px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;">
-            <div style="font-size:13px;font-weight:700;color:#9a3412;margin-bottom:6px;">⚠ ¿Tu dominio ya apunta a nuestros servidores?</div>
-            <p style="margin:0 0 8px;font-size:13px;line-height:1.55;color:#7c2d12;">El acceso por <strong>${escape(panelUrl)}</strong> sólo funciona cuando tu dominio resuelve a nuestro servidor.${showNs ? " Si aún no configuraste los <em>nameservers</em> (siguiente sección) o la propagación DNS no ha terminado, no podrás iniciar sesión por esa URL todavía." : " Si la propagación DNS aún no ha terminado, usa el acceso por IP de abajo mientras tanto."}</p>
-            ${
-              acct.ip
-                ? `<p style="margin:0;font-size:13px;line-height:1.55;color:#7c2d12;">Mientras tanto puedes ingresar por la IP del servidor: <a href="${ipPanelUrl}" style="font-family:Consolas,Monaco,monospace;color:#0b1a6a;font-weight:700;">${ipPanelUrl}</a>. Tu navegador mostrará una advertencia de certificado — es normal, continúa con la opción "Avanzado → Continuar de todos modos".</p>`
-                : `<p style="margin:0;font-size:13px;line-height:1.55;color:#7c2d12;">Espera a que la propagación DNS termine (entre 15 minutos y 24 horas) antes de intentar ingresar.</p>`
-            }
-          </div>
+          ${dnsNotice}
 
           ${
             showNs
@@ -111,7 +127,7 @@ export async function sendCpanelCredentials(
           </table>
 
           <p style="margin:0 0 16px;font-size:13px;line-height:1.55;color:#6b7088;">Alternativamente puedes crear un registro A apuntando a la IP de arriba. La propagación DNS toma entre 15 minutos y 24 horas. ¿Necesitas ayuda? Escríbenos a <a href="mailto:soporte@geniorama.co" style="color:#0b1a6a;font-weight:600;">soporte@geniorama.co</a> y te guiamos.</p>`
-              : `<p style="margin:0 0 16px;font-size:13px;line-height:1.55;color:#6b7088;">Tu dominio ya está apuntando a nuestro servidor. Si necesitas configurarlo en otro dominio, crea un registro A hacia la IP de arriba o escríbenos a <a href="mailto:soporte@geniorama.co" style="color:#0b1a6a;font-weight:600;">soporte@geniorama.co</a> y te guiamos.</p>`
+              : `<p style="margin:0 0 16px;font-size:13px;line-height:1.55;color:#6b7088;">Si tu dominio todavía no apunta a nuestro servidor, crea un registro A hacia la IP de arriba o escríbenos a <a href="mailto:soporte@geniorama.co" style="color:#0b1a6a;font-weight:600;">soporte@geniorama.co</a> y lo configuramos contigo.</p>`
           }
 
           <h3 style="font-size:15px;margin:24px 0 8px;color:#0b1a6a;">Próximos pasos</h3>
@@ -149,12 +165,14 @@ export async function sendCpanelCredentials(
     `Webmail: ${webmailUrl}`,
     acct.ip ? `IP del servidor: ${acct.ip}` : "",
     ``,
-    `IMPORTANTE: el acceso por ${panelUrl} sólo funciona cuando tu dominio`,
-    `apunta a nuestros servidores.`,
-    acct.ip
+    panelNeedsDns
+      ? `IMPORTANTE: el acceso por ${panelUrl} sólo funciona cuando tu dominio`
+      : `Puedes entrar a ${panelUrl} de inmediato, sin esperar la propagación DNS.`,
+    panelNeedsDns ? `apunta a nuestros servidores.` : "",
+    panelNeedsDns && acct.ip
       ? `Mientras tanto puedes entrar por IP: ${ipPanelUrl} (el navegador`
       : "",
-    acct.ip
+    panelNeedsDns && acct.ip
       ? `mostrará una advertencia de certificado — es normal, continúa de todos modos).`
       : "",
     ``,
@@ -204,7 +222,19 @@ function getOpsRecipients(): string[] {
     .filter(Boolean);
 }
 
-export async function sendProvisioningFailureAlert(order: Order, errorMessage: string) {
+export async function sendProvisioningFailureAlert(
+  order: Order,
+  errorMessage: string,
+  opts?: {
+    /**
+     * Set to "plesk" when the primary reseller is full and the account has to
+     * be created by hand in the Plesk reseller. Turns the alert into a work
+     * order — steps plus the ready-to-run /api/admin/complete-order call —
+     * instead of a generic failure.
+     */
+    manualPanel?: PanelType;
+  },
+) {
   const ops = getOpsRecipients();
   if (!ops.length) {
     console.warn("[mail] no ops recipients configured for provisioning alert");
@@ -218,7 +248,21 @@ export async function sendProvisioningFailureAlert(order: Order, errorMessage: s
     `${order.payload.contact.firstName} ${order.payload.contact.lastName}`.trim();
   const domain = order.payload.hosting.domain;
 
-  const subject = `[ALERTA] Pedido ${order.id} pagado pero NO aprovisionado`;
+  const manualPlesk = opts?.manualPanel === "plesk";
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "https://hosting.geniorama.co";
+
+  const completeOrderCall = [
+    `curl -X POST ${baseUrl}/api/admin/complete-order \\`,
+    `  -H "Authorization: Bearer $RESCUE_SECRET" \\`,
+    `  -H "Content-Type: application/json" \\`,
+    `  -d '{"orderId":"${order.id}","username":"USUARIO","password":"CLAVE",`,
+    `       "panel":"plesk","ip":"IP_DEL_SERVIDOR",`,
+    `       "ns1":"NS1_DEL_PROVEEDOR","ns2":"NS2_DEL_PROVEEDOR"}'`,
+  ].join("\n");
+
+  const subject = manualPlesk
+    ? `[ACCIÓN] Pedido ${order.id} — crear cuenta manual en Plesk`
+    : `[ALERTA] Pedido ${order.id} pagado pero NO aprovisionado`;
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -226,12 +270,16 @@ export async function sendProvisioningFailureAlert(order: Order, errorMessage: s
 <body style="margin:0;padding:0;background:#fff;font-family:Consolas,Menlo,monospace;color:#1f2333;font-size:13px;line-height:1.6;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px;">
     <tr><td>
-      <div style="background:#b91c1c;color:#fff;padding:14px 18px;border-radius:8px 8px 0 0;font-family:Arial,Helvetica,sans-serif;font-weight:800;font-size:16px;">
-        ⚠ Aprovisionamiento fallido — acción requerida
+      <div style="background:${manualPlesk ? "#b45309" : "#b91c1c"};color:#fff;padding:14px 18px;border-radius:8px 8px 0 0;font-family:Arial,Helvetica,sans-serif;font-weight:800;font-size:16px;">
+        ${manualPlesk ? "⚠ Reseller cPanel lleno — crear la cuenta en Plesk" : "⚠ Aprovisionamiento fallido — acción requerida"}
       </div>
       <div style="background:#fff7ed;border:1px solid #fed7aa;border-top:none;padding:18px;border-radius:0 0 8px 8px;">
         <p style="margin:0 0 12px;font-family:Arial,Helvetica,sans-serif;font-size:14px;">
-          El cliente ya pagó pero <strong>WHM rechazó la creación de la cuenta cPanel</strong>. Hay que crearla a mano o contactar al cliente para reembolso.
+          ${
+            manualPlesk
+              ? `El cliente ya pagó y el <strong>reseller de cPanel no aceptó la cuenta</strong>. Créala a mano en el <strong>reseller de Plesk</strong> y luego corre el comando de abajo: el sistema se encarga del resto (credenciales al cliente, tickets y tarjeta de Trello).`
+              : `El cliente ya pagó pero <strong>WHM rechazó la creación de la cuenta cPanel</strong>. Hay que crearla a mano o contactar al cliente para reembolso.`
+          }
         </p>
 
         <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:8px;">
@@ -247,24 +295,39 @@ export async function sendProvisioningFailureAlert(order: Order, errorMessage: s
         </table>
 
         <div style="margin-top:18px;padding:12px 14px;background:#1f2333;color:#fca5a5;border-radius:6px;font-family:Consolas,Menlo,monospace;">
-          <div style="color:#fbbf24;font-weight:700;margin-bottom:6px;">Error WHM:</div>
+          <div style="color:#fbbf24;font-weight:700;margin-bottom:6px;">${manualPlesk ? "Motivo del rechazo en WHM:" : "Error WHM:"}</div>
           ${escape(errorMessage)}
         </div>
 
-        <p style="margin:18px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#3a3f59;">
+        ${
+          manualPlesk
+            ? `<p style="margin:18px 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#3a3f59;">
+          <strong>Próximos pasos:</strong><br>
+          1. Entra al reseller de <strong>Plesk</strong> y crea la suscripción para <strong>${escape(domain)}</strong> con el service plan equivalente al plan de arriba.<br>
+          2. Anota el usuario, la contraseña y la IP del servidor.<br>
+          3. Corre este comando — envía credenciales al cliente, sincroniza con tickets y crea la tarjeta de Trello:
+        </p>
+        <pre style="margin:0;padding:12px 14px;background:#1f2333;color:#a7f3d0;border-radius:6px;font-family:Consolas,Menlo,monospace;font-size:12px;line-height:1.5;overflow-x:auto;white-space:pre-wrap;">${escape(completeOrderCall)}</pre>
+        <p style="margin:10px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#3a3f59;">
+          4. El cliente ya recibió el correo automático de "tu hosting está en activación".
+        </p>`
+            : `<p style="margin:18px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#3a3f59;">
           <strong>Próximos pasos:</strong><br>
           1. Identifica la causa (espacio en servidor, dominio duplicado, etc.).<br>
           2. Crea la cuenta manualmente en WHM con el plan y dominio de arriba.<br>
           3. Una vez creada, registra <code>provisioning</code> en la tabla <code>orders</code> de Supabase y envía credenciales al cliente, o invoca el endpoint <code>/api/dev/send-credentials</code>.<br>
           4. El cliente ya recibió un correo de "tu hosting está en activación" automático.
-        </p>
+        </p>`
+        }
       </div>
     </td></tr>
   </table>
 </body></html>`;
 
   const text = [
-    `ALERTA: Pedido ${order.id} pagado pero NO aprovisionado.`,
+    manualPlesk
+      ? `ACCIÓN: Pedido ${order.id} — el reseller de cPanel está lleno, crear la cuenta en Plesk.`
+      : `ALERTA: Pedido ${order.id} pagado pero NO aprovisionado.`,
     ``,
     `Plan: ${order.payload.planId} (${order.payload.billing})`,
     `Dominio: ${domain}`,
@@ -273,10 +336,20 @@ export async function sendProvisioningFailureAlert(order: Order, errorMessage: s
     `Pago Wompi: ${order.paymentRef ?? "—"}`,
     `Monto: $${order.amount.toLocaleString("es-CO")} COP`,
     ``,
-    `Error WHM:`,
+    manualPlesk ? `Motivo del rechazo en WHM:` : `Error WHM:`,
     `  ${errorMessage}`,
     ``,
-    `Crear cuenta manualmente y enviar credenciales, o reembolsar.`,
+    ...(manualPlesk
+      ? [
+          `1. Crea la suscripción en el reseller de Plesk para ${domain}.`,
+          `2. Anota usuario, contraseña e IP.`,
+          `3. Corre:`,
+          ``,
+          completeOrderCall,
+          ``,
+          `El cliente ya recibió el aviso de "hosting en activación".`,
+        ]
+      : [`Crear cuenta manualmente y enviar credenciales, o reembolsar.`]),
   ].join("\n");
 
   const result = await sendMail({
@@ -316,7 +389,7 @@ export async function sendProvisioningDelayedNotice(order: Order) {
         <tr><td style="padding:28px 32px;">
           <p style="margin:0 0 14px;font-size:15px;line-height:1.55;">Hola <strong>${escape(recipientName)}</strong>,</p>
           <p style="margin:0 0 14px;font-size:15px;line-height:1.55;">¡Gracias por tu compra! Recibimos tu pago para el dominio <strong>${escape(order.payload.hosting.domain)}</strong>.</p>
-          <p style="margin:0 0 14px;font-size:15px;line-height:1.55;">Estamos terminando de configurar tu cuenta cPanel manualmente. En las <strong>próximas 24 horas hábiles</strong> recibirás un segundo correo con tus credenciales de acceso y los datos para apuntar tu dominio.</p>
+          <p style="margin:0 0 14px;font-size:15px;line-height:1.55;">Estamos terminando de configurar tu cuenta de hosting manualmente. En las <strong>próximas 24 horas hábiles</strong> recibirás un segundo correo con tus credenciales de acceso y los datos para apuntar tu dominio.</p>
           <p style="margin:0 0 14px;font-size:15px;line-height:1.55;">Si tienes urgencia o alguna duda, escríbenos a <a href="mailto:soporte@geniorama.co" style="color:#0b1a6a;font-weight:600;">soporte@geniorama.co</a> mencionando tu pedido <strong>${escape(order.id)}</strong> y te respondemos enseguida.</p>
           <p style="margin:24px 0 0;font-size:13px;line-height:1.55;color:#6b7088;">Pedido <strong>${escape(order.id)}</strong> · ${new Date().toLocaleDateString("es-CO")}</p>
         </td></tr>
@@ -333,7 +406,7 @@ export async function sendProvisioningDelayedNotice(order: Order) {
     ``,
     `Recibimos tu pago para ${order.payload.hosting.domain}. ¡Gracias!`,
     ``,
-    `Estamos terminando de configurar tu cuenta cPanel manualmente.`,
+    `Estamos terminando de configurar tu cuenta de hosting manualmente.`,
     `En las próximas 24 horas hábiles recibirás un segundo correo con tus credenciales y la información para apuntar tu dominio.`,
     ``,
     `Si tienes urgencia, escríbenos a soporte@geniorama.co mencionando tu pedido ${order.id}.`,

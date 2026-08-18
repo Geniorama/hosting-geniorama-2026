@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import { orderStore, type Order } from "./order-store";
 import {
   sendCpanelCredentials,
@@ -6,8 +5,23 @@ import {
   sendProvisioningFailureAlert,
   type CredentialsPresentation,
 } from "./mail-templates";
+import {
+  classifyProvisionError,
+  deriveUsername,
+  generatePassword,
+  type HostingAccountResult,
+  type PanelType,
+} from "./hosting-account";
+import {
+  createPleskAccount,
+  isPleskConfigured,
+  pleskNameservers,
+  pleskPanelUrl,
+} from "./plesk";
 import { syncOrderToTickets } from "./tickets-integration";
 import { createInvoiceCard } from "./trello";
+
+export { deriveUsername, generatePassword };
 
 function getEnv(name: string): string {
   const v = process.env[name];
@@ -35,36 +49,12 @@ export function packageForPlan(planId: string): string {
   return planToPackage[planId] ?? tryEnv("WHM_DEFAULT_PACKAGE") ?? "default";
 }
 
-export function deriveUsername(domain: string): string {
-  const stem = domain.split(".")[0] ?? "user";
-  const cleaned = stem.replace(/[^a-z0-9]/gi, "").toLowerCase();
-  const head = cleaned.slice(0, 7) || "user";
-  const suffix = Math.floor(Math.random() * 10).toString();
-  return `${head}${suffix}`.slice(0, 8);
-}
-
-export function generatePassword(): string {
-  const alphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const symbols = "!@#$%^&*";
-  const buf = crypto.randomBytes(16);
-  let pwd = "";
-  for (let i = 0; i < 14; i++) pwd += alphabet[buf[i] % alphabet.length];
-  pwd += symbols[buf[14] % symbols.length];
-  pwd += (buf[15] % 10).toString();
-  return pwd;
-}
-
-export type WhmCreateAcctResult =
-  | {
-      ok: true;
-      username: string;
-      domain: string;
-      password: string;
-      package: string;
-      ip?: string;
-      raw: unknown;
-    }
-  | { ok: false; error: string; raw?: unknown };
+/**
+ * Alias kept because mail-templates, tickets-integration and the admin routes
+ * type against this name. The shape is provider-agnostic now — a Plesk account
+ * comes back in exactly the same envelope.
+ */
+export type WhmCreateAcctResult = HostingAccountResult;
 
 type WhmRawResponse = {
   metadata?: { result?: 0 | 1; reason?: string };
@@ -108,16 +98,21 @@ export async function createCpanelAccount(order: Order): Promise<WhmCreateAcctRe
       cache: "no-store",
     });
   } catch (err) {
-    return { ok: false, error: `WHM unreachable: ${(err as Error).message}` };
+    return {
+      ok: false,
+      error: `WHM unreachable: ${(err as Error).message}`,
+      code: "unknown",
+    };
   }
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    return { ok: false, error: `WHM HTTP ${res.status}: ${body.slice(0, 200)}` };
+    const error = `WHM HTTP ${res.status}: ${body.slice(0, 200)}`;
+    return { ok: false, error, code: classifyProvisionError(error) };
   }
 
   const json = (await res.json().catch(() => null)) as WhmRawResponse | null;
-  if (!json) return { ok: false, error: "WHM returned non-JSON response" };
+  if (!json) return { ok: false, error: "WHM returned non-JSON response", code: "unknown" };
 
   const success =
     json.metadata?.result === 1 || json.result?.[0]?.status === 1;
@@ -125,7 +120,7 @@ export async function createCpanelAccount(order: Order): Promise<WhmCreateAcctRe
   if (!success) {
     const reason =
       json.metadata?.reason ?? json.result?.[0]?.statusmsg ?? "Unknown WHM error";
-    return { ok: false, error: reason, raw: json };
+    return { ok: false, error: reason, code: classifyProvisionError(reason), raw: json };
   }
 
   return {
@@ -136,6 +131,63 @@ export async function createCpanelAccount(order: Order): Promise<WhmCreateAcctRe
     package: pkg,
     ip: json.data?.ip,
     raw: json,
+  };
+}
+
+/**
+ * What to do when the primary (cPanel/WHM) reseller refuses the account.
+ *
+ *   "manual" (default) — do NOT call the Plesk API. When WHM says it is full,
+ *                        email the team a work order to create the subscription
+ *                        by hand in the Plesk reseller and finish it with
+ *                        /api/admin/complete-order. This is the current mode
+ *                        while the Plesk provider's API access is unresolved.
+ *   "capacity"         — create it automatically in Plesk, but only when WHM
+ *                        ran out of accounts or disk.
+ *   "any"              — automatic on any error except a conflict (a domain or
+ *                        login that already exists would clash there too, and
+ *                        we would risk creating the account twice).
+ *   "off"              — never mention Plesk; behaves as before it existed.
+ *
+ * Switch to "capacity" once /api/admin/plesk-check reports the credentials work.
+ */
+function fallbackMode(): "manual" | "capacity" | "any" | "off" {
+  const v = process.env.PROVISION_FALLBACK_MODE?.trim().toLowerCase();
+  return v === "capacity" || v === "any" || v === "off" ? v : "manual";
+}
+
+/** The team creates it in Plesk by hand; we just tell them, with the data. */
+function shouldRequestManualPlesk(
+  result: Extract<HostingAccountResult, { ok: false }>,
+): boolean {
+  return fallbackMode() === "manual" && result.code === "capacity";
+}
+
+function shouldAutoFallback(result: Extract<HostingAccountResult, { ok: false }>): boolean {
+  const mode = fallbackMode();
+  if (mode === "off" || mode === "manual") return false;
+  if (mode === "any") return result.code !== "conflict";
+  return result.code === "capacity";
+}
+
+/**
+ * How the credentials email should describe a Plesk account. Unlike the manual
+ * flow in /api/admin/complete-order — where the domain already pointed at the
+ * reseller — a customer we auto-provision here still has to repoint their
+ * domain, so the nameserver section stays in whenever we know the values.
+ */
+function pleskPresentation(): CredentialsPresentation {
+  const { ns1, ns2 } = pleskNameservers();
+  if (!ns1 || !ns2) {
+    // Without them the customer gets no instructions for repointing the domain.
+    console.warn("[plesk] PLESK_NS1/PLESK_NS2 not set — credentials email will omit nameservers");
+  }
+  return {
+    panel: "plesk",
+    ns1,
+    ns2,
+    panelUrl: pleskPanelUrl(),
+    showNameservers: Boolean(ns1 && ns2),
   };
 }
 
@@ -153,13 +205,63 @@ export async function provisionIfNeeded(order: Order): Promise<WhmCreateAcctResu
     return null;
   }
 
-  const result = await createCpanelAccount(order);
-  if (!result.ok) {
-    console.error("[whm] createacct failed", { order: order.id, error: result.error });
+  let result = await createCpanelAccount(order);
+  let panel: PanelType = "cpanel";
+  // Set when the alert should be a "create it in Plesk by hand" work order
+  // rather than a generic provisioning failure.
+  let manualPanel: PanelType | undefined;
 
+  if (!result.ok) {
+    console.error("[whm] createacct failed", {
+      order: order.id,
+      error: result.error,
+      code: result.code ?? "unknown",
+    });
+
+    const primaryError = result.error;
+
+    if (shouldRequestManualPlesk(result)) {
+      manualPanel = "plesk";
+      console.warn("[provision] primary reseller full — handing over to manual Plesk", order.id);
+    } else if (!shouldAutoFallback(result)) {
+      console.log("[provision] not falling back", {
+        order: order.id,
+        mode: fallbackMode(),
+        code: result.code ?? "unknown",
+      });
+    } else if (!isPleskConfigured()) {
+      console.warn("[provision] primary reseller is full but Plesk is not configured", order.id);
+    } else {
+      console.warn("[provision] primary reseller unavailable, falling back to Plesk", {
+        order: order.id,
+        code: result.code ?? "unknown",
+      });
+
+      const fallback = await createPleskAccount(order);
+      if (fallback.ok) {
+        result = fallback;
+        panel = "plesk";
+      } else {
+        console.error("[plesk] fallback failed", { order: order.id, error: fallback.error });
+        // Both resellers refused it — surface the two reasons in the ops alert.
+        result = {
+          ok: false,
+          error: `cPanel: ${primaryError} · Plesk: ${fallback.error}`,
+          code: fallback.code,
+          raw: fallback.raw,
+        };
+      }
+    }
+  }
+
+  if (!result.ok) {
     // Capa 1: alerta al equipo de soporte para activación manual.
     try {
-      await sendProvisioningFailureAlert(order, result.error);
+      await sendProvisioningFailureAlert(
+        order,
+        result.error,
+        manualPanel ? { manualPanel } : undefined,
+      );
     } catch (err) {
       console.error("[whm] ops alert send failed", err);
     }
@@ -174,7 +276,12 @@ export async function provisionIfNeeded(order: Order): Promise<WhmCreateAcctResu
     return result;
   }
 
-  await completeProvisioning(order, result);
+  await completeProvisioning(
+    order,
+    result,
+    panel === "plesk" ? pleskPresentation() : undefined,
+    { provider: panel === "plesk" ? "plesk" : "whm" },
+  );
 
   return result;
 }
@@ -196,8 +303,10 @@ export async function completeProvisioning(
   order: Order,
   result: Extract<WhmCreateAcctResult, { ok: true }>,
   presentation?: CredentialsPresentation,
-  flow?: { skipCredentialsEmail?: boolean },
+  flow?: { skipCredentialsEmail?: boolean; provider?: string },
 ): Promise<void> {
+  const panel: PanelType = presentation?.panel ?? "cpanel";
+
   try {
     await orderStore.setProvisioning(order.id, {
       username: result.username,
@@ -205,15 +314,18 @@ export async function completeProvisioning(
       package: result.package,
       ip: result.ip,
       provisionedAt: Date.now(),
+      panel,
+      provider: flow?.provider ?? (panel === "plesk" ? "plesk" : "whm"),
     });
   } catch (err) {
     console.error("[whm] failed to persist provisioning info", err);
   }
 
-  console.log("[whm] cPanel account created", {
+  console.log("[provision] hosting account created", {
     order: order.id,
     username: result.username,
     domain: result.domain,
+    panel,
   });
 
   if (flow?.skipCredentialsEmail) {
