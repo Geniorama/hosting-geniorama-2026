@@ -584,14 +584,14 @@ export function CheckoutForm({ planId, billing, couponCode }: CheckoutFormProps)
 
         {form.domainOwnership === "owned" ? (
           <p className="text-muted" style={{ fontSize: "0.8rem", margin: "-0.4rem 0 0" }}>
-            Sin <code>http://</code> ni <code>www.</code>. Crearemos tu cuenta cPanel apuntando a
-            este dominio.
+            Sin <code>http://</code> ni <code>www.</code>. Crearemos tu cuenta de hosting
+            (cPanel o Plesk) apuntando a este dominio.
           </p>
         ) : (
           <div className="domain-ownership-note">
             <strong>Tu hosting quedará reservado</strong>
             <p>
-              Para activar tu cuenta cPanel necesitamos que el dominio esté registrado a tu
+              Para activar tu cuenta de hosting necesitamos que el dominio esté registrado a tu
               nombre y apuntado a nuestros servidores. Recibirás el pedido y un correo con los
               pasos para registrar el dominio; en cuanto nos confirmes, activamos el servicio
               sin cargo adicional.

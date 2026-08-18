@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     "Planes de hosting SSD optimizados para WordPress, e-commerce y campañas publicitarias. Asistencia 24/7 con tickets y agentes de IA, precios en pesos colombianos.",
   openGraph: {
     title: "Hosting Geniorama",
-    description: "Hosting profesional con cPanel, SSD y asistencia 24/7. Desde $15.000/mes.",
+    description: "Hosting profesional con cPanel o Plesk, SSD y asistencia 24/7. Desde $15.000/mes.",
     type: "website",
   },
 };
