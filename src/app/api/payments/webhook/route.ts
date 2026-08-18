@@ -5,7 +5,7 @@ import {
   verifyWebhookChecksum,
 } from "@/lib/paymentsway";
 import { orderStore, type OrderStatus } from "@/lib/order-store";
-import { provisionIfNeeded } from "@/lib/whm";
+import { handlePaidOrder } from "@/lib/renewals";
 
 const statusMap: Record<number, OrderStatus> = {
   [PaymentsWayStatus.SUCCESS]: "success",
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
 
     if (newStatus === "success") {
       try {
-        await provisionIfNeeded(updated);
+        await handlePaidOrder(updated);
       } catch (err) {
         console.error("[paymentsway:webhook] provision error", err);
       }

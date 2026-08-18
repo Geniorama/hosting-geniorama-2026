@@ -5,7 +5,7 @@ import {
   verifyWompiSignature,
 } from "@/lib/wompi";
 import { orderStore } from "@/lib/order-store";
-import { provisionIfNeeded } from "@/lib/whm";
+import { handlePaidOrder } from "@/lib/renewals";
 
 export async function POST(req: Request) {
   let payload: WompiEventPayload;
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
 
       if (newStatus === "success") {
         try {
-          await provisionIfNeeded(updated);
+          await handlePaidOrder(updated);
         } catch (err) {
           console.error("[wompi:webhook] provision error", err);
         }

@@ -1,3 +1,4 @@
+import { computePeriodEnd } from "./billing-period";
 import type { Order } from "./order-store";
 import { plans } from "./plans";
 
@@ -145,11 +146,14 @@ function buildCardDescription(order: Order): string {
     .join("\n");
 }
 
+/**
+ * End of the paid period. Prefers the period persisted on the order so the card
+ * and the renewal reminders can never disagree; falls back to computing it for
+ * orders created before periods were stored.
+ */
 function computeDueDate(order: Order): Date {
-  const days = order.payload.billing === "annual" ? 365 : 30;
-  const d = new Date(order.updatedAt);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d;
+  if (order.periodEnd) return new Date(order.periodEnd);
+  return computePeriodEnd(order.updatedAt, order.payload.billing);
 }
 
 function formatDate(d: Date): string {

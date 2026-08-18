@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { orderStore } from "@/lib/order-store";
-import { provisionIfNeeded } from "@/lib/whm";
+import { handlePaidOrder } from "@/lib/renewals";
 
 function constantTimeEquals(a: string, b: string): boolean {
   const ab = Buffer.from(a);
@@ -56,9 +56,23 @@ export async function POST(req: Request) {
     );
   }
 
-  console.log("[admin:rescue] running provisionIfNeeded", { order: orderId });
+  console.log("[admin:rescue] running handlePaidOrder", { order: orderId });
 
-  const result = await provisionIfNeeded(order);
+  const outcome = await handlePaidOrder(order);
+
+  // The domain already had a live account, so this payment extended it instead
+  // of creating a second one.
+  if (outcome.kind === "renewal") {
+    return NextResponse.json({
+      ok: true,
+      orderId,
+      renewal: true,
+      renews: outcome.renews,
+      periodEnd: outcome.periodEnd ? new Date(outcome.periodEnd).toISOString() : null,
+    });
+  }
+
+  const result = outcome.result;
 
   if (result === null) {
     return NextResponse.json({

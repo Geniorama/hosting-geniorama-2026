@@ -52,6 +52,15 @@ export type Order = {
   provisioning?: ProvisioningInfo;
   ticketsSync?: TicketsSyncInfo;
   invoiceTask?: InvoiceTaskInfo;
+  /** Paid period. Set when the payment webhook marks the order successful. */
+  periodStart?: number;
+  periodEnd?: number;
+  /** Id of the order this one renews; absent on a first signup. */
+  renewalOf?: string;
+  /** Renewal notices already sent, keyed (`d30`, `expired`, `suspend`). */
+  renewalNotices?: Record<string, string>;
+  /** When the grace period ran out and suspension was requested. */
+  suspendedAt?: number;
 };
 
 type OrderRow = {
@@ -69,6 +78,11 @@ type OrderRow = {
   provisioning: ProvisioningInfo | null;
   tickets_sync: TicketsSyncInfo | null;
   invoice_task: InvoiceTaskInfo | null;
+  period_start: string | null;
+  period_end: string | null;
+  renewal_of: string | null;
+  renewal_notices: Record<string, string> | null;
+  suspended_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -88,6 +102,11 @@ const fromRow = (row: OrderRow): Order => ({
   provisioning: row.provisioning ?? undefined,
   ticketsSync: row.tickets_sync ?? undefined,
   invoiceTask: row.invoice_task ?? undefined,
+  periodStart: row.period_start ? new Date(row.period_start).getTime() : undefined,
+  periodEnd: row.period_end ? new Date(row.period_end).getTime() : undefined,
+  renewalOf: row.renewal_of ?? undefined,
+  renewalNotices: row.renewal_notices ?? undefined,
+  suspendedAt: row.suspended_at ? new Date(row.suspended_at).getTime() : undefined,
   createdAt: new Date(row.created_at).getTime(),
   updatedAt: new Date(row.updated_at).getTime(),
 });
@@ -174,5 +193,121 @@ export const orderStore = {
       .update({ invoice_task: info })
       .eq("id", id);
     if (error) throw new Error(`orders.setInvoiceTask failed: ${error.message}`);
+  },
+
+  async setBillingPeriod(id: string, startMs: number, endMs: number): Promise<void> {
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        period_start: new Date(startMs).toISOString(),
+        period_end: new Date(endMs).toISOString(),
+      })
+      .eq("id", id);
+    if (error) throw new Error(`orders.setBillingPeriod failed: ${error.message}`);
+  },
+
+  async setRenewalOf(id: string, previousOrderId: string): Promise<void> {
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from("orders")
+      .update({ renewal_of: previousOrderId })
+      .eq("id", id);
+    if (error) throw new Error(`orders.setRenewalOf failed: ${error.message}`);
+  },
+
+  /**
+   * Records that a renewal notice went out. Read-modify-write on the jsonb: the
+   * cron is the only writer and runs sequentially, so a merge is enough and
+   * avoids needing a Postgres function for jsonb_set.
+   */
+  async markRenewalNotice(id: string, key: string): Promise<void> {
+    const supabase = getSupabaseAdmin();
+    const { data, error: readError } = await supabase
+      .from("orders")
+      .select("renewal_notices")
+      .eq("id", id)
+      .maybeSingle<{ renewal_notices: Record<string, string> | null }>();
+    if (readError) throw new Error(`orders.markRenewalNotice read failed: ${readError.message}`);
+
+    const notices = { ...(data?.renewal_notices ?? {}), [key]: new Date().toISOString() };
+    const { error } = await supabase
+      .from("orders")
+      .update({ renewal_notices: notices })
+      .eq("id", id);
+    if (error) throw new Error(`orders.markRenewalNotice failed: ${error.message}`);
+  },
+
+  async setSuspendedAt(id: string, whenMs: number): Promise<void> {
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from("orders")
+      .update({ suspended_at: new Date(whenMs).toISOString() })
+      .eq("id", id);
+    if (error) throw new Error(`orders.setSuspendedAt failed: ${error.message}`);
+  },
+
+  /**
+   * Paid orders whose period ends before `beforeMs` — the renewal cron's work
+   * list. Renewed orders are excluded by the caller (a period superseded by a
+   * newer order for the same domain no longer needs chasing).
+   */
+  async listExpiringBefore(beforeMs: number): Promise<Order[]> {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("status", "success")
+      .not("period_end", "is", null)
+      // Once suspension was requested the order leaves the work list for good,
+      // which also stops the sweep from re-scanning years of old orders.
+      .is("suspended_at", null)
+      .lte("period_end", new Date(beforeMs).toISOString())
+      .order("period_end", { ascending: true })
+      .returns<OrderRow[]>();
+
+    if (error) throw new Error(`orders.listExpiringBefore failed: ${error.message}`);
+    return (data ?? []).map(fromRow);
+  },
+
+  /** The paid order that renews `orderId`, if the customer already renewed. */
+  async findRenewalOf(orderId: string): Promise<Order | null> {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("status", "success")
+      .eq("renewal_of", orderId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .returns<OrderRow[]>();
+
+    if (error) throw new Error(`orders.findRenewalOf failed: ${error.message}`);
+    return data?.[0] ? fromRow(data[0]) : null;
+  },
+
+  /**
+   * The live paid order for a domain, most recent first. Used to tell a renewal
+   * apart from a new signup: if the domain already has a provisioned order, the
+   * new payment extends that service instead of creating another account.
+   */
+  async findLatestProvisionedByDomain(
+    domain: string,
+    excludeOrderId?: string,
+  ): Promise<Order | null> {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("status", "success")
+      .eq("payload->hosting->>domain", domain)
+      .not("provisioning", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(5)
+      .returns<OrderRow[]>();
+
+    if (error) throw new Error(`orders.findLatestProvisionedByDomain failed: ${error.message}`);
+    const match = (data ?? []).map(fromRow).find((o) => o.id !== excludeOrderId);
+    return match ?? null;
   },
 };

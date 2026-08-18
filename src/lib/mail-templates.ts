@@ -1,6 +1,7 @@
 import type { PanelType } from "./hosting-account";
 import { sendMail } from "./mail";
 import type { Order } from "./order-store";
+import { plans } from "./plans";
 import type { WhmCreateAcctResult } from "./whm";
 
 const escape = (s: string) =>
@@ -426,6 +427,278 @@ export async function sendProvisioningDelayedNotice(order: Order) {
     console.error("[mail] delayed notice failed", { order: order.id, error: result.error });
   } else {
     console.log("[mail] delayed notice sent", { order: order.id, to: recipientEmail, id: result.id });
+  }
+  return result;
+}
+
+// ── Renovaciones ─────────────────────────────────────────────────────────────
+
+function planLabel(order: Order): string {
+  const all = [...plans.web, ...plans.ads];
+  return all.find((p) => p.id === order.payload.planId)?.name ?? order.payload.planId;
+}
+
+function billingLabel(order: Order): string {
+  return order.payload.billing === "annual" ? "anual" : "mensual";
+}
+
+function customerRecipient(order: Order): { email: string; name: string } {
+  return {
+    email: order.payload.invoice.email || order.payload.contact.email,
+    name:
+      order.payload.invoice.legalName ||
+      `${order.payload.contact.firstName} ${order.payload.contact.lastName}`.trim(),
+  };
+}
+
+function longDate(ms: number): string {
+  return new Date(ms).toLocaleDateString("es-CO", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+/** Shared shell so the renewal emails look like the rest without duplicating markup. */
+function customerShell(args: {
+  subject: string;
+  heading: string;
+  headingColor: string;
+  body: string;
+}): string {
+  return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><title>${escape(args.subject)}</title></head>
+<body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#1f2333;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6fb;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(15,23,42,0.07);">
+        <tr><td style="background:${args.headingColor};padding:22px 32px;color:#fff;font-size:18px;font-weight:800;">
+          ${args.heading}
+        </td></tr>
+        <tr><td style="padding:28px 32px;">
+          ${args.body}
+        </td></tr>
+        <tr><td style="background:#f7f8fc;padding:18px 32px;font-size:12px;color:#6b7088;text-align:center;">
+          ¿Dudas? Escríbenos a <a href="mailto:soporte@geniorama.co" style="color:#0b1a6a;font-weight:600;text-decoration:none;">soporte@geniorama.co</a>. Geniorama Hosting.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+function ctaButton(url: string, label: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0;"><tr><td style="background:#0b1a6a;border-radius:8px;">
+    <a href="${url}" style="display:inline-block;padding:13px 26px;color:#fff;font-weight:700;font-size:15px;text-decoration:none;">${label}</a>
+  </td></tr></table>`;
+}
+
+function serviceFacts(order: Order): string {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;background:#f7f8fc;border:1px solid #e3e6f1;border-radius:10px;">
+    <tr><td style="padding:12px 18px;border-bottom:1px solid #e3e6f1;">
+      <div style="font-size:12px;color:#6b7088;text-transform:uppercase;letter-spacing:0.6px;">Dominio</div>
+      <div style="font-weight:700;margin-top:3px;">${escape(order.payload.hosting.domain)}</div>
+    </td></tr>
+    <tr><td style="padding:12px 18px;">
+      <div style="font-size:12px;color:#6b7088;text-transform:uppercase;letter-spacing:0.6px;">Plan</div>
+      <div style="font-weight:700;margin-top:3px;">${escape(planLabel(order))} · ${billingLabel(order)}</div>
+    </td></tr>
+  </table>`;
+}
+
+/** "Tu plan vence en N días" — sent once per reminder window. */
+export async function sendRenewalReminder(order: Order, daysLeft: number, renewUrl: string) {
+  const to = customerRecipient(order);
+  const endLabel = order.periodEnd ? longDate(order.periodEnd) : "próximamente";
+  const dayWord = daysLeft === 1 ? "día" : "días";
+  const subject = `Tu hosting para ${order.payload.hosting.domain} vence en ${daysLeft} ${dayWord}`;
+
+  const html = customerShell({
+    subject,
+    heading: `Tu plan vence en ${daysLeft} ${dayWord}`,
+    headingColor: "#0b1a6a",
+    body: `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;">Hola <strong>${escape(to.name)}</strong>,</p>
+          <p style="margin:0 0 14px;font-size:15px;line-height:1.55;">Tu servicio de hosting llega al final de su periodo el <strong>${escape(endLabel)}</strong>. Para que tu sitio y tus correos sigan funcionando sin interrupción, renueva antes de esa fecha.</p>
+          ${serviceFacts(order)}
+          ${ctaButton(renewUrl, "Renovar mi plan")}
+          <p style="margin:0;font-size:13px;line-height:1.55;color:#6b7088;">Renuevas al mismo precio del periodo anterior. Si prefieres no continuar, no tienes que hacer nada: el servicio se suspende al terminar el periodo. Si quieres cambiar de plan, escríbenos y te ayudamos.</p>`,
+  });
+
+  const text = [
+    `Hola ${to.name},`,
+    ``,
+    `Tu hosting para ${order.payload.hosting.domain} vence el ${endLabel} (en ${daysLeft} ${dayWord}).`,
+    `Plan: ${planLabel(order)} · ${billingLabel(order)}`,
+    ``,
+    `Renueva aquí: ${renewUrl}`,
+    ``,
+    `Renuevas al mismo precio del periodo anterior. Si prefieres no continuar,`,
+    `no tienes que hacer nada: el servicio se suspende al terminar el periodo.`,
+    ``,
+    `Pedido: ${order.id}`,
+    `Geniorama Hosting`,
+  ].join("\n");
+
+  const result = await sendMail({ to, subject, html, text });
+  if (!result.ok) {
+    console.error("[mail] renewal reminder failed", { order: order.id, error: result.error });
+  } else {
+    console.log("[mail] renewal reminder sent", { order: order.id, daysLeft, id: result.id });
+  }
+  return result;
+}
+
+/** "Tu plan venció" — sent once, with the grace period spelled out. */
+export async function sendServiceExpiredNotice(order: Order, grace: number, renewUrl: string) {
+  const to = customerRecipient(order);
+  const endLabel = order.periodEnd ? longDate(order.periodEnd) : "recientemente";
+  const subject = `Tu hosting para ${order.payload.hosting.domain} venció`;
+
+  const graceLine =
+    grace > 0
+      ? `Mantendremos tu cuenta activa <strong>${grace} ${grace === 1 ? "día" : "días"}</strong> más. Pasado ese plazo suspendemos el servicio y tu sitio dejará de responder.`
+      : `Tu cuenta queda suspendida y tu sitio dejará de responder.`;
+
+  const html = customerShell({
+    subject,
+    heading: "Tu plan venció",
+    headingColor: "#b45309",
+    body: `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;">Hola <strong>${escape(to.name)}</strong>,</p>
+          <p style="margin:0 0 14px;font-size:15px;line-height:1.55;">El periodo de tu servicio terminó el <strong>${escape(endLabel)}</strong> y aún no hemos recibido la renovación.</p>
+          ${serviceFacts(order)}
+          <p style="margin:14px 0;font-size:15px;line-height:1.55;">${graceLine}</p>
+          ${ctaButton(renewUrl, "Renovar ahora")}
+          <p style="margin:0;font-size:13px;line-height:1.55;color:#6b7088;">Tus archivos y correos siguen intactos durante este plazo. Si ya pagaste, escríbenos y lo verificamos de inmediato.</p>`,
+  });
+
+  const text = [
+    `Hola ${to.name},`,
+    ``,
+    `Tu hosting para ${order.payload.hosting.domain} venció el ${endLabel}.`,
+    grace > 0
+      ? `Mantenemos tu cuenta activa ${grace} ${grace === 1 ? "día" : "días"} más antes de suspenderla.`
+      : `Tu cuenta queda suspendida.`,
+    ``,
+    `Renueva aquí: ${renewUrl}`,
+    ``,
+    `Tus archivos y correos siguen intactos durante este plazo.`,
+    `Si ya pagaste, escríbenos a soporte@geniorama.co y lo verificamos.`,
+    ``,
+    `Pedido: ${order.id}`,
+    `Geniorama Hosting`,
+  ].join("\n");
+
+  const result = await sendMail({ to, subject, html, text });
+  if (!result.ok) {
+    console.error("[mail] expiry notice failed", { order: order.id, error: result.error });
+  } else {
+    console.log("[mail] expiry notice sent", { order: order.id, id: result.id });
+  }
+  return result;
+}
+
+/** Ops work order: the grace period ran out, someone has to suspend the account. */
+export async function sendSuspensionWorkOrder(order: Order) {
+  const ops = getOpsRecipients();
+  if (!ops.length) {
+    console.warn("[mail] no ops recipients configured for suspension work order");
+    return { ok: false as const, error: "no ops recipients" };
+  }
+
+  const customer = customerRecipient(order);
+  const panel = order.provisioning?.panel === "plesk" ? "Plesk" : "cPanel";
+  const endLabel = order.periodEnd ? longDate(order.periodEnd) : "—";
+  const subject = `[ACCIÓN] Suspender ${order.payload.hosting.domain} — periodo vencido`;
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><title>${escape(subject)}</title></head>
+<body style="margin:0;padding:0;background:#fff;font-family:Consolas,Menlo,monospace;color:#1f2333;font-size:13px;line-height:1.6;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px;">
+    <tr><td>
+      <div style="background:#b45309;color:#fff;padding:14px 18px;border-radius:8px 8px 0 0;font-family:Arial,Helvetica,sans-serif;font-weight:800;font-size:16px;">
+        ⏳ Periodo vencido y sin renovar — suspender cuenta
+      </div>
+      <div style="background:#fff7ed;border:1px solid #fed7aa;border-top:none;padding:18px;border-radius:0 0 8px 8px;">
+        <p style="margin:0 0 12px;font-family:Arial,Helvetica,sans-serif;font-size:14px;">
+          Venció el plazo de gracia y el cliente no renovó. Suspende la cuenta en <strong>${panel}</strong>.
+        </p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:8px;">
+          <tr><td style="padding:6px 0;width:150px;color:#6b7088;">Pedido</td><td style="padding:6px 0;font-weight:700;">${escape(order.id)}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7088;">Dominio</td><td style="padding:6px 0;font-weight:700;">${escape(order.payload.hosting.domain)}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7088;">Plan</td><td style="padding:6px 0;">${escape(planLabel(order))} (${billingLabel(order)})</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7088;">Venció</td><td style="padding:6px 0;">${escape(endLabel)}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7088;">Panel</td><td style="padding:6px 0;">${panel}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7088;">Usuario</td><td style="padding:6px 0;">${escape(order.provisioning?.username ?? "—")}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7088;">Cliente</td><td style="padding:6px 0;">${escape(customer.name)}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7088;">Email</td><td style="padding:6px 0;"><a href="mailto:${escape(customer.email)}">${escape(customer.email)}</a></td></tr>
+        </table>
+        <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#3a3f59;">
+          El cliente ya recibió el aviso de vencimiento y el de plazo de gracia. Antes de borrar nada, confirma que no haya pagado por otro medio.
+        </p>
+      </div>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  const text = [
+    `ACCIÓN: suspender ${order.payload.hosting.domain} — periodo vencido sin renovar.`,
+    ``,
+    `Pedido: ${order.id}`,
+    `Plan: ${planLabel(order)} (${billingLabel(order)})`,
+    `Venció: ${endLabel}`,
+    `Panel: ${panel} · Usuario: ${order.provisioning?.username ?? "—"}`,
+    `Cliente: ${customer.name} <${customer.email}>`,
+    ``,
+    `El cliente ya recibió los avisos. Confirma que no haya pagado por otro medio`,
+    `antes de borrar nada.`,
+  ].join("\n");
+
+  const result = await sendMail({ to: ops.map((email) => ({ email })), subject, html, text });
+  if (!result.ok) {
+    console.error("[mail] suspension work order failed", { order: order.id, error: result.error });
+  } else {
+    console.log("[mail] suspension work order sent", { order: order.id, to: ops, id: result.id });
+  }
+  return result;
+}
+
+/** Receipt for a renewal payment — no credentials, the account already exists. */
+export async function sendRenewalConfirmed(order: Order) {
+  const to = customerRecipient(order);
+  const endLabel = order.periodEnd ? longDate(order.periodEnd) : "—";
+  const subject = `Renovación confirmada — ${order.payload.hosting.domain}`;
+
+  const html = customerShell({
+    subject,
+    heading: "Renovación confirmada",
+    headingColor: "#047857",
+    body: `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;">Hola <strong>${escape(to.name)}</strong>,</p>
+          <p style="margin:0 0 14px;font-size:15px;line-height:1.55;">Recibimos tu pago y tu servicio queda cubierto hasta el <strong>${escape(endLabel)}</strong>. No tienes que hacer nada más: tus credenciales, tu sitio y tus correos siguen igual.</p>
+          ${serviceFacts(order)}
+          <p style="margin:14px 0 0;font-size:13px;line-height:1.55;color:#6b7088;">Tu factura electrónica llegará por separado. Pedido <strong>${escape(order.id)}</strong>.</p>`,
+  });
+
+  const text = [
+    `Hola ${to.name},`,
+    ``,
+    `Recibimos tu pago. Tu servicio para ${order.payload.hosting.domain} queda cubierto`,
+    `hasta el ${endLabel}.`,
+    ``,
+    `Plan: ${planLabel(order)} · ${billingLabel(order)}`,
+    `Tus credenciales no cambian.`,
+    ``,
+    `Tu factura electrónica llegará por separado.`,
+    `Pedido: ${order.id}`,
+    `Geniorama Hosting`,
+  ].join("\n");
+
+  const result = await sendMail({ to, subject, html, text });
+  if (!result.ok) {
+    console.error("[mail] renewal confirmation failed", { order: order.id, error: result.error });
+  } else {
+    console.log("[mail] renewal confirmation sent", { order: order.id, id: result.id });
   }
   return result;
 }
