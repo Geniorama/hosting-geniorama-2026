@@ -152,7 +152,9 @@ export function CheckoutSummary({ plan, billing, coupon, onApplyCoupon }: Checko
       </div>
 
       <p className="checkout-summary-note">
-        Renovación al mismo precio del primer periodo. Puedes cambiar de plan cuando quieras.
+        Pago único por este periodo: no guardamos tu tarjeta ni cobramos automáticamente. Te
+        avisamos antes del vencimiento y renuevas al mismo precio. Puedes cambiar de plan cuando
+        quieras.
       </p>
     </aside>
   );

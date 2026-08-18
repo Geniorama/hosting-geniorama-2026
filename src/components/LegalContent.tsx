@@ -37,10 +37,12 @@ export function TerminosContent() {
       <section>
         <h2>4. Renovación y cancelación</h2>
         <p>
-          Los servicios no tienen permanencia obligatoria. El cliente puede cancelar la
-          renovación en cualquier momento antes del próximo ciclo de facturación
-          comunicándose con soporte. Los pagos correspondientes a períodos ya iniciados
-          no son reembolsables salvo que la legislación aplicable indique lo contrario.
+          Los servicios no tienen permanencia obligatoria ni cobro automático: cada
+          período se paga por separado y Geniorama no almacena medios de pago. Antes del
+          vencimiento enviamos avisos de renovación al correo registrado. Si el cliente no
+          renueva, el servicio se suspende una vez terminado el período y el plazo de gracia
+          informado en dichos avisos. Los pagos correspondientes a períodos ya iniciados no
+          son reembolsables salvo que la legislación aplicable indique lo contrario.
         </p>
       </section>
 
