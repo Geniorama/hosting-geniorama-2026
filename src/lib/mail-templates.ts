@@ -4,7 +4,7 @@ import type { Order } from "./order-store";
 import { plans } from "./plans";
 import type { WhmCreateAcctResult } from "./whm";
 
-const escape = (s: string) =>
+export const escape = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 export type CredentialsPresentation = {
@@ -212,7 +212,7 @@ export async function sendCpanelCredentials(
   return result;
 }
 
-function getOpsRecipients(): string[] {
+export function getOpsRecipients(): string[] {
   const raw =
     process.env.MAIL_OPS_ALERT ??
     process.env.MAIL_BCC ??
@@ -460,7 +460,7 @@ function longDate(ms: number): string {
 }
 
 /** Shared shell so the renewal emails look like the rest without duplicating markup. */
-function customerShell(args: {
+export function customerShell(args: {
   subject: string;
   heading: string;
   headingColor: string;
@@ -488,7 +488,7 @@ function customerShell(args: {
 </body></html>`;
 }
 
-function ctaButton(url: string, label: string): string {
+export function ctaButton(url: string, label: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0;"><tr><td style="background:#0b1a6a;border-radius:8px;">
     <a href="${url}" style="display:inline-block;padding:13px 26px;color:#fff;font-weight:700;font-size:15px;text-decoration:none;">${label}</a>
   </td></tr></table>`;

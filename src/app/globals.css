@@ -2241,6 +2241,909 @@ body {
   to { opacity: 1; }
 }
 
+/* ── ASESOR IA ──────────────────────────────────────────── */
+.advisor-section {
+  border-top: 1px solid var(--color-border-soft);
+  border-bottom: 1px solid var(--color-border-soft);
+  background: linear-gradient(180deg, rgba(6, 18, 78, 0.55), transparent 60%);
+}
+
+.advisor-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+@media (min-width: 940px) {
+  .advisor-layout {
+    grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+    gap: 3.5rem;
+  }
+}
+
+/* ── Columna de contexto ──────────────────────────────── */
+.advisor-intro {
+  max-width: 460px;
+}
+
+.advisor-title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4.5vw, 3rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 0.92;
+  letter-spacing: -0.01em;
+  margin: 0 0 1rem;
+}
+
+.advisor-lead {
+  color: var(--color-text-soft);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  margin: 0 0 1.75rem;
+}
+
+.advisor-steps {
+  list-style: none;
+  margin: 0 0 1.75rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.advisor-steps li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.92rem;
+  color: var(--color-text);
+}
+
+.advisor-step-num {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-border-strong);
+  color: var(--color-pink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.advisor-note {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+.advisor-note a {
+  color: var(--color-text-soft);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.advisor-note a:hover {
+  color: var(--color-pink);
+}
+
+/* ── Panel de conversación ────────────────────────────── */
+.advisor-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-card);
+  border: 1.5px solid var(--color-border);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.advisor-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.85rem 1.15rem;
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.advisor-avatar {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: rgba(228, 18, 121, 0.12);
+  border: 1px solid rgba(228, 18, 121, 0.35);
+  color: var(--color-pink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.advisor-panel-id {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+.advisor-panel-id strong {
+  font-size: 0.9rem;
+  color: #fff;
+}
+.advisor-panel-id span {
+  font-size: 0.76rem;
+  color: var(--color-muted);
+}
+
+.advisor-log {
+  display: flex;
+  flex-direction: column;
+  padding: 1.15rem;
+  min-height: 210px;
+  max-height: 400px;
+  overflow-y: auto;
+  /* Sin `overscroll-behavior: contain` a propósito: al llegar al final del hilo el
+     scroll sigue con la página en vez de quedarse trabado dentro de la caja. */
+  scrollbar-width: thin;
+}
+
+/* Estado vacío: ocupa el espacio del hilo antes del primer mensaje. */
+.advisor-hints {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.advisor-hints li {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.86rem;
+  color: var(--color-text-soft);
+}
+.advisor-hint-num {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-pink);
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* margin-top:auto empuja el hilo al fondo; con `justify-content: flex-end` en el
+   contenedor con scroll el navegador recorta los mensajes de arriba. */
+.advisor-log-inner {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.advisor-msg {
+  max-width: 90%;
+  padding: 0.7rem 0.95rem;
+  border-radius: 14px;
+  font-size: 0.93rem;
+  line-height: 1.55;
+}
+.advisor-msg--assistant {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--color-border-soft);
+  color: var(--color-text);
+  border-bottom-left-radius: 4px;
+}
+.advisor-msg--user {
+  align-self: flex-end;
+  background: var(--color-pink);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.advisor-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0.85rem 1rem;
+}
+.advisor-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-text-soft);
+  animation: advisor-blink 1.2s infinite ease-in-out;
+}
+.advisor-typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.advisor-typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes advisor-blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .advisor-typing span {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+/* ── Tarjeta del plan recomendado ─────────────────────── */
+.advisor-rec {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.1rem 1.15rem;
+  background: var(--color-bg);
+  border: 1.5px solid var(--color-pink);
+  border-radius: 16px;
+}
+
+.advisor-rec-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-pink);
+}
+
+.advisor-rec-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.advisor-rec-name {
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 1;
+  margin: 0 0 0.2rem;
+  color: #fff;
+}
+
+.advisor-rec-family {
+  font-size: 0.78rem;
+  color: var(--color-text-soft);
+}
+
+.advisor-rec-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.advisor-rec-price strong {
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #fff;
+}
+.advisor-rec-price span {
+  font-size: 0.8rem;
+  color: var(--color-text-soft);
+}
+.advisor-rec-price em {
+  flex-basis: 100%;
+  text-align: right;
+  font-style: normal;
+  font-size: 0.74rem;
+  color: var(--color-muted);
+}
+
+.advisor-rec-reason {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--color-text-soft);
+}
+
+.advisor-rec-features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.advisor-rec-features li {
+  font-size: 0.76rem;
+  color: var(--color-text);
+  background: var(--color-card);
+  border: 1px solid var(--color-border-soft);
+  border-radius: 100px;
+  padding: 0.28rem 0.7rem;
+}
+
+.advisor-rec-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.15rem;
+}
+.advisor-rec-actions .btn {
+  padding: 0.6rem 1.25rem;
+  font-size: 0.9rem;
+}
+
+.advisor-rec-link {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-soft);
+  transition: color 0.18s;
+}
+.advisor-rec-link:hover {
+  color: var(--color-pink);
+}
+
+/* ── Alternativa (una sola línea, sin competir) ────────── */
+.advisor-alt {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.95rem;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: 12px;
+  color: var(--color-text-soft);
+  font-size: 0.85rem;
+  transition: border-color 0.18s, color 0.18s;
+}
+.advisor-alt:hover {
+  border-color: var(--color-pink);
+  color: #fff;
+}
+.advisor-alt-label {
+  color: var(--color-muted);
+}
+.advisor-alt-name {
+  font-weight: 700;
+  color: #fff;
+}
+.advisor-alt-price {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* ── Pie del panel: error, chips y campo ───────────────── */
+.advisor-foot {
+  border-top: 1px solid var(--color-border-soft);
+  padding: 0.9rem 1.15rem 1.05rem;
+}
+
+.advisor-error {
+  margin: 0 0 0.7rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #fca5a5;
+}
+
+.advisor-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+
+.advisor-chip {
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--color-text);
+  background: transparent;
+  border: 1.5px solid var(--color-border);
+  border-radius: 100px;
+  padding: 0.4rem 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.18s, color 0.18s, background 0.18s;
+}
+.advisor-chip:hover {
+  border-color: var(--color-pink);
+  color: #fff;
+  background: rgba(228, 18, 121, 0.08);
+}
+
+.advisor-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--color-bg);
+  border: 1.5px solid var(--color-border);
+  border-radius: 100px;
+  padding: 0.3rem 0.35rem 0.3rem 1.1rem;
+  transition: border-color 0.18s;
+}
+.advisor-form:focus-within {
+  border-color: var(--color-pink);
+}
+
+.advisor-input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 0.93rem;
+  color: #fff;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0.5rem 0;
+}
+.advisor-input::placeholder {
+  color: var(--color-muted);
+}
+
+.advisor-send {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-pink);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.1s;
+}
+.advisor-send:hover:not(:disabled) {
+  background: var(--color-pink-hover);
+}
+.advisor-send:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.advisor-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (max-width: 560px) {
+  .advisor-msg {
+    max-width: 100%;
+  }
+  .advisor-rec-top {
+    align-items: flex-start;
+  }
+  .advisor-rec-price {
+    justify-content: flex-start;
+  }
+  .advisor-rec-price em {
+    text-align: left;
+  }
+  .advisor-alt {
+    flex-wrap: wrap;
+  }
+  .advisor-alt-price {
+    margin-left: 0;
+  }
+}
+
+/* ── CAPTURA DE LEADS (dentro del asesor) ───────────────── */
+.lead-teaser {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  margin-bottom: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--color-text-soft);
+  background: rgba(228, 18, 121, 0.06);
+  border: 1px solid rgba(228, 18, 121, 0.3);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s;
+}
+.lead-teaser:hover {
+  background: rgba(228, 18, 121, 0.12);
+  border-color: var(--color-pink);
+}
+.lead-teaser strong {
+  color: #fff;
+}
+.lead-teaser-icon {
+  flex-shrink: 0;
+  color: var(--color-pink);
+  display: inline-flex;
+}
+
+.lead-form {
+  margin-bottom: 0.85rem;
+  padding: 0.95rem 1rem;
+  background: var(--color-bg);
+  border: 1.5px solid var(--color-border);
+  border-radius: 14px;
+}
+
+.lead-form-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--color-text-soft);
+}
+.lead-form-title strong {
+  color: #fff;
+}
+
+.lead-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+}
+@media (min-width: 620px) {
+  .lead-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+  /* El grupo del celular (indicativo + número) ocupa la fila completa. */
+  .lead-fields > *:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.lead-phone {
+  display: flex;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.lead-phone .lead-input {
+  flex: 1;
+}
+
+.lead-dial {
+  flex-shrink: 0;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: #fff;
+  background: var(--color-card);
+  border: 1.5px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.6rem 0.5rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.18s;
+}
+.lead-dial:focus {
+  border-color: var(--color-pink);
+}
+.lead-dial option {
+  background: var(--color-card);
+  color: #fff;
+}
+
+.lead-input {
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: #fff;
+  background: var(--color-card);
+  border: 1.5px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.6rem 0.85rem;
+  outline: none;
+  min-width: 0;
+  transition: border-color 0.18s;
+}
+.lead-input::placeholder {
+  color: var(--color-muted);
+}
+.lead-input:focus {
+  border-color: var(--color-pink);
+}
+
+.lead-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.lead-consent input {
+  margin-top: 0.15rem;
+  accent-color: var(--color-pink);
+  flex-shrink: 0;
+}
+.lead-consent a {
+  color: var(--color-text-soft);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.lead-consent a:hover {
+  color: var(--color-pink);
+}
+
+.lead-error {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: #fca5a5;
+}
+
+.lead-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.85rem;
+}
+.lead-actions .btn {
+  padding: 0.55rem 1.35rem;
+  font-size: 0.88rem;
+}
+
+.lead-cancel {
+  font-family: inherit;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.18s;
+}
+.lead-cancel:hover {
+  color: var(--color-text);
+}
+
+.lead-done {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.85rem;
+  padding: 0.85rem 1rem;
+  background: rgba(74, 222, 128, 0.08);
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  border-radius: 12px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--color-text-soft);
+}
+.lead-done strong {
+  color: #fff;
+}
+
+/* ── LANDING DEL ASESOR (/asesor) ───────────────────────── */
+.lp-bar {
+  border-bottom: 1px solid var(--color-border-soft);
+}
+.lp-bar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+.lp-bar-tag {
+  margin-left: 0.6rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-pink);
+}
+.lp-bar-note {
+  font-size: 0.82rem;
+  color: var(--color-text-soft);
+}
+@media (max-width: 520px) {
+  .lp-bar-note {
+    display: none;
+  }
+}
+
+.lp-hero {
+  position: relative;
+  padding: 3rem 0 3.5rem;
+  overflow: hidden;
+}
+.lp-hero::before {
+  content: "";
+  position: absolute;
+  inset: -20% -20% auto -20%;
+  height: 520px;
+  background: radial-gradient(closest-side, rgba(228, 18, 121, 0.2), transparent 70%),
+    radial-gradient(closest-side, rgba(93, 43, 184, 0.28), transparent 70%);
+  background-position: 30% 20%, 70% 40%;
+  background-repeat: no-repeat;
+  filter: blur(26px);
+  z-index: 0;
+  pointer-events: none;
+}
+.lp-hero-inner {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.lp-title {
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 6.5vw, 4.25rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 0.9;
+  letter-spacing: -0.015em;
+  margin: 0 0 1.1rem;
+}
+
+.lp-subtitle {
+  max-width: 620px;
+  margin: 0 auto 2.25rem;
+  font-size: clamp(1rem, 1.6vw, 1.15rem);
+  line-height: 1.55;
+  color: var(--color-text-soft);
+}
+
+.lp-chat {
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.lp-hero-note {
+  max-width: 620px;
+  margin: 1.1rem auto 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+  text-align: center;
+}
+
+.lp-trust {
+  border-top: 1px solid var(--color-border-soft);
+  border-bottom: 1px solid var(--color-border-soft);
+  padding: 2.5rem 0;
+  background: rgba(6, 18, 78, 0.4);
+}
+.lp-trust-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+@media (min-width: 640px) {
+  .lp-trust-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 980px) {
+  .lp-trust-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+.lp-trust-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 0.65rem;
+  align-items: start;
+}
+.lp-trust-item strong {
+  font-size: 0.95rem;
+  color: #fff;
+}
+.lp-trust-item span:last-child {
+  grid-column: 2;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--color-text-soft);
+}
+.lp-trust-check {
+  grid-row: span 2;
+  width: 22px;
+  height: 22px;
+  margin-top: 0.1rem;
+  border-radius: 50%;
+  background: rgba(228, 18, 121, 0.12);
+  color: var(--color-pink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.lp-trust-check svg {
+  width: 12px;
+  height: 12px;
+}
+
+.lp-faq {
+  padding: 3.5rem 0;
+}
+.lp-faq-inner {
+  max-width: 760px;
+}
+.lp-faq-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 1;
+  margin: 0 0 1.75rem;
+  text-align: center;
+}
+.lp-faq-list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+.lp-faq-item dt {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 0.3rem;
+}
+.lp-faq-item dd {
+  margin: 0;
+  font-size: 0.93rem;
+  line-height: 1.6;
+  color: var(--color-text-soft);
+}
+
+.lp-faq-cta {
+  margin-top: 2.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--color-border-soft);
+  text-align: center;
+}
+.lp-faq-cta p {
+  margin: 0 0 1rem;
+  color: var(--color-text-soft);
+}
+
+.lp-foot {
+  border-top: 1px solid var(--color-border-soft);
+  padding: 1.5rem 0;
+}
+.lp-foot-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+  color: var(--color-muted);
+}
+.lp-foot-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+}
+.lp-foot-links a {
+  color: var(--color-text-soft);
+  transition: color 0.18s;
+}
+.lp-foot-links a:hover {
+  color: var(--color-pink);
+}
+
 /* ── UTILS ──────────────────────────────────────────────── */
 .text-muted {
   color: var(--color-muted);

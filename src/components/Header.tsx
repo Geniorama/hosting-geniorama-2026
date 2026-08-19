@@ -6,6 +6,7 @@ import { Logo } from "./Logo";
 
 const NAV_ITEMS = [
   { href: "#planes", label: "Planes" },
+  { href: "#asesor", label: "Asesor IA" },
   { href: "#caracteristicas", label: "Características" },
   { href: "#comparar", label: "Comparar" },
   { href: "#faq", label: "FAQ" },

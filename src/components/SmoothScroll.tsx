@@ -12,6 +12,11 @@ export function SmoothScroll() {
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       smoothWheel: true,
       touchMultiplier: 1.2,
+      // Sin esto, Lenis se queda con la rueda del mouse en TODA la página y las cajas
+      // con scroll propio (el log del asesor, el cuerpo del modal legal) se vuelven
+      // imposibles de desplazar. Con la opción activa, la rueda mueve la caja mientras
+      // le quede recorrido y, al llegar al tope, devuelve el control a la página.
+      allowNestedScroll: true,
     });
 
     let frame = 0;
