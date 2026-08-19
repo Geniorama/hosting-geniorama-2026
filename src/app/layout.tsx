@@ -19,6 +19,9 @@ const barlowCondensed = Barlow_Condensed({
 });
 
 export const metadata: Metadata = {
+  // Necesario para que og:image salga con URL absoluta; sin esto Next avisa en
+  // build y arma la ruta contra localhost.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL ?? "https://hosting.geniorama.co"),
   title: "Hosting Geniorama — Hosting profesional para tu sitio web",
   description:
     "Planes de hosting SSD optimizados para WordPress, e-commerce y campañas publicitarias. Asistencia 24/7 con tickets y agentes de IA, precios en pesos colombianos.",

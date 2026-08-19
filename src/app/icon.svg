@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Geniorama">
+  <rect width="48" height="48" rx="10" fill="#000a3d"/>
+  <g transform="translate(7 7) scale(1.0929)">
+    <path fill="#fff" d="M1.381 15.555 15.555 1.381l14.173 14.174-14.173 14.174zM15.555 0 0 15.555l15.555 15.554 15.554-15.554z"/>
+    <path fill="#fff" transform="translate(-9.049 -9.059)" d="M24.659 35.757 13.525 24.614 24.6 13.54l1.933 1.933-9.141 9.141 9.2 9.21z"/>
+    <path fill="#fff" transform="translate(-35.843 -17.623)" d="m55.514 40.257-1.943-1.923 5.051-5.1-4.922-4.992 1.929-1.9 6.893 6.913z"/>
+    <path fill="#e41279" transform="rotate(-45 25.068 -7.41)" d="M0 0h4.204v4.204H0z"/>
+  </g>
+</svg>
