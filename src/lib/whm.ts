@@ -169,6 +169,21 @@ function authHeader(server: WhmServer): string {
   return `whm ${server.apiUser}:${server.apiToken}`;
 }
 
+/**
+ * A WHM host that drops packets (wrong port, firewall, IP not allowlisted)
+ * leaves `fetch` hanging until the serverless platform kills the whole function
+ * — the caller gets a 502 with no diagnosis. These caps make the failure come
+ * back as a normal, readable error instead.
+ *
+ * The probe is read-only, so it can give up fast, inside the function's own
+ * budget. Creating an account cannot: WHM takes its time and aborting a request
+ * that already reached the server would leave an orphan account behind while we
+ * report a failure. Keep that one generous — the platform's own limit is the
+ * real ceiling.
+ */
+const WHM_PROBE_TIMEOUT_MS = 8_000;
+const WHM_CREATE_TIMEOUT_MS = 45_000;
+
 export async function createCpanelAccount(
   order: Order,
   server: WhmServer = primaryServer(),
@@ -209,11 +224,15 @@ export async function createCpanelAccount(
         Authorization: authHeader(server),
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(WHM_CREATE_TIMEOUT_MS),
     });
   } catch (err) {
+    const e = err as Error;
+    const detail =
+      e.name === "TimeoutError" ? `no respondió en ${WHM_CREATE_TIMEOUT_MS / 1000}s` : e.message;
     return {
       ok: false,
-      error: `WHM unreachable (${server.key}): ${(err as Error).message}`,
+      error: `WHM unreachable (${server.key}): ${detail}`,
       code: "unknown",
     };
   }
@@ -300,6 +319,7 @@ export async function whmProbe(which: "primary" | "secondary"): Promise<WhmProbe
       method: "GET",
       headers: { Authorization: authHeader(server) },
       cache: "no-store",
+      signal: AbortSignal.timeout(WHM_PROBE_TIMEOUT_MS),
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
@@ -319,7 +339,14 @@ export async function whmProbe(which: "primary" | "secondary"): Promise<WhmProbe
       }
     }
   } catch (err) {
-    auth = { ok: false, detail: `WHM unreachable: ${(err as Error).message}` };
+    const e = err as Error;
+    auth = {
+      ok: false,
+      detail:
+        e.name === "TimeoutError"
+          ? `El servidor no respondió en ${WHM_PROBE_TIMEOUT_MS / 1000}s — revisa el host y el puerto (:2087) y que la IP de Netlify esté permitida en el firewall.`
+          : `WHM unreachable: ${e.message}`,
+    };
   }
 
   const plans = Object.keys(planToPackage).map((plan) => {

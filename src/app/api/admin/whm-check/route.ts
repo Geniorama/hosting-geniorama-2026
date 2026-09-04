@@ -60,7 +60,11 @@ export async function GET(req: Request) {
       : !probe.auth.ok
         ? "El token no autenticó. Revísalo en WHM → Manage API Tokens y confirma que la IP del servidor esté permitida."
         : missing.length
-          ? `Estos planes apuntan a paquetes que no existen en el reseller: ${missing.join(", ")}. Ajusta WHM2_PACKAGE_PREFIX o WHM2_PACKAGE_MAP con los nombres de "packages".`
-          : "Listo: el token autentica y todos los planes tienen paquete. Puedes usar PROVISION_FALLBACK_MODE=capacity.",
+          ? which === "secondary"
+            ? `Estos planes apuntan a paquetes que no existen en el reseller: ${missing.join(", ")}. Ajusta WHM2_PACKAGE_PREFIX o WHM2_PACKAGE_MAP con los nombres de "packages".`
+            : `Estos planes apuntan a paquetes que no existen en el reseller primario: ${missing.join(", ")}. Un pedido de esos planes fallaría al crear la cuenta: crea el paquete en WHM o corrige planToPackage en src/lib/whm.ts con los nombres de "packages".`
+          : which === "secondary"
+            ? "Listo: el token autentica y todos los planes tienen paquete. Puedes usar PROVISION_FALLBACK_MODE=capacity."
+            : "Listo: el token autentica y todos los planes tienen paquete en el reseller primario.",
   });
 }
