@@ -40,15 +40,24 @@ export async function POST(req: Request) {
 
   let apply = false;
   let overwrite = false;
+  let from: "plan" | undefined;
+  let planFilter: string[] | undefined;
   let targets: Array<"primary" | "secondary"> | undefined;
   try {
     const body = (await req.json()) as {
       apply?: unknown;
       targets?: unknown;
       overwrite?: unknown;
+      from?: unknown;
+      plans?: unknown;
     };
     apply = body?.apply === true;
     overwrite = body?.overwrite === true;
+    from = body?.from === "plan" ? "plan" : undefined;
+    if (Array.isArray(body?.plans)) {
+      const picked = body.plans.filter((p): p is string => typeof p === "string" && Boolean(p));
+      if (picked.length) planFilter = picked;
+    }
     if (Array.isArray(body?.targets)) {
       const picked = body.targets.filter(
         (t): t is "primary" | "secondary" => t === "primary" || t === "secondary",
@@ -59,11 +68,13 @@ export async function POST(req: Request) {
     // No body means a dry run over both resellers.
   }
 
-  const result = await syncPackages({ apply, targets, overwrite });
+  const result = await syncPackages({ apply, targets, overwrite, from, plans: planFilter });
 
   console.log("[admin:whm-packages] sync", {
     apply,
     overwrite,
+    from: from ?? "primary",
+    plans: planFilter ?? "todos",
     targets: targets ?? ["primary", "secondary"],
     ok: result.ok,
     error: result.error,

@@ -438,6 +438,38 @@ const PACKAGE_SPECS: Record<string, WhmPackage> = {
   },
 };
 
+/**
+ * The limits src/lib/plans.ts actually promises the customer. Everything else
+ * in a package (FTP accounts, parked domains, feature list) is an operational
+ * choice the page says nothing about, so aligning a package "to what we
+ * promise" must not touch those.
+ */
+const PROMISED_FIELDS = [
+  "QUOTA",
+  "BWLIMIT",
+  "MAXPOP",
+  "MAX_EMAILACCT_QUOTA",
+  "MAXSQL",
+  "MAXADDON",
+  "MAXSUB",
+] as const;
+
+/**
+ * The existing package with the plan's promised limits laid over it. Used to
+ * bring a package back in line with the page — in either direction: the mega
+ * package was handing out 50 GB against 40 GB promised, and 8 databases against
+ * 10 promised.
+ */
+function promisedPackage(plan: string, current: WhmPackage): WhmPackage | null {
+  const spec = PACKAGE_SPECS[plan];
+  if (!spec) return null;
+  const merged: WhmPackage = { ...current };
+  for (const field of PROMISED_FIELDS) {
+    if (spec[field] !== undefined) merged[field] = spec[field];
+  }
+  return merged;
+}
+
 /** The subset that every WHM accepts, for the retry when a field is rejected. */
 const CORE_PACKAGE_FIELDS = new Set([
   "quota",
@@ -525,11 +557,18 @@ export async function syncPackages(opts: {
   apply: boolean;
   targets?: Array<"primary" | "secondary">;
   /**
-   * Rewrite the second reseller's packages with the primary's limits, instead
-   * of leaving whatever is already there. For repairing a package that was
-   * created from an outdated source.
+   * Rewrite packages that already exist instead of leaving them as they are.
+   * For repairing one that was created from an outdated source.
    */
   overwrite?: boolean;
+  /**
+   * What an overwrite aligns to: "primary" (default) copies the primary
+   * reseller's limits onto the second one; "plan" lays the limits promised in
+   * src/lib/plans.ts over whatever each server has, on both of them.
+   */
+  from?: "primary" | "plan";
+  /** Restrict the run to these plan ids. */
+  plans?: string[];
 }): Promise<{
   ok: boolean;
   apply: boolean;
@@ -548,7 +587,10 @@ export async function syncPackages(opts: {
   }
 
   const primary = primaryServer();
-  const plans = Object.keys(planToPackage);
+  const alignTo = opts.from ?? "primary";
+  const plans = Object.keys(planToPackage).filter(
+    (plan) => !opts.plans?.length || opts.plans.includes(plan),
+  );
 
   // Read each package by name instead of listing: listpkgs hides the ones the
   // reseller does not own, which is how "genioram_News Page" looked missing
@@ -581,26 +623,32 @@ export async function syncPackages(opts: {
       const current = key === "primary" ? reference.get(plan) : await getPackage(server, target);
 
       if (current) {
-        // Only the second reseller can be realigned, and only against the
-        // primary: the primary itself has no reference to be aligned to.
-        if (!opts.overwrite || key === "primary" || !copied) {
+        // Aligning to the plan works on both servers: the reference is the page,
+        // not the other reseller. Aligning to the primary only makes sense for
+        // the second one — the primary has nothing above it to copy from.
+        const aligned =
+          alignTo === "plan" ? promisedPackage(plan, current) : key === "secondary" ? copied : null;
+        const alignedLabel =
+          alignTo === "plan" ? "límites prometidos en el plan" : aligned?.name;
+
+        if (!opts.overwrite || !aligned || !alignedLabel) {
           actions.push({ server: key, plan, target, status: "exists" });
           continue;
         }
         if (!opts.apply) {
-          actions.push({ server: key, plan, target, status: "would-align", source: copied.name });
+          actions.push({ server: key, plan, target, status: "would-align", source: alignedLabel });
           continue;
         }
-        const edited = await writePackage(server, target, copied, false, "edit");
+        const edited = await writePackage(server, target, aligned, false, "edit");
         actions.push(
           edited.ok
-            ? { server: key, plan, target, status: "aligned", source: copied.name }
+            ? { server: key, plan, target, status: "aligned", source: alignedLabel }
             : {
                 server: key,
                 plan,
                 target,
                 status: "error",
-                source: copied.name,
+                source: alignedLabel,
                 detail: edited.error,
               },
         );
