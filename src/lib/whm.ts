@@ -342,6 +342,67 @@ const PACKAGE_FIELDS: Array<[whmField: string, addpkgParam: string]> = [
   ["LANG", "language"],
 ];
 
+/**
+ * Some limits mean "unlimited" as a 0 on the primary, but a newer WHM rejects
+ * the 0 outright ("Invalid value 0 for the max_email_per_hour setting") and the
+ * whole package creation fails with it.
+ */
+const ZERO_MEANS_UNLIMITED = new Set(["max_email_per_hour", "max_defer_fail_percentage"]);
+
+/**
+ * Packages that exist on neither reseller, so there is nothing to copy: the
+ * limits come from what the plan promises the customer in src/lib/plans.ts.
+ * "3 dominios" is the main domain plus 2 addons — the convention the existing
+ * packages already follow (Ads_Basic: 3 dominios → MAXADDON 2).
+ *
+ * Keyed by plan id; `name` is the package name WITHOUT the reseller prefix,
+ * which WHM adds on its own.
+ */
+const PACKAGE_SPECS: Record<string, WhmPackage> = {
+  news: {
+    name: "News Page",
+    QUOTA: "20480", // 20 GB
+    BWLIMIT: "122880", // 120 GB
+    MAXPOP: "10",
+    MAX_EMAILACCT_QUOTA: "500",
+    MAXSQL: "10",
+    MAXADDON: "2",
+    MAXSUB: "5",
+    MAXPARK: "0",
+    MAXFTP: "3",
+    MAXLST: "0",
+    CGI: "y",
+    HASSHELL: "n",
+    CPMOD: "jupiter",
+    FEATURELIST: "default",
+    LANG: "es",
+    DIGESTAUTH: "n",
+    MAX_EMAIL_PER_HOUR: "unlimited",
+    MAX_DEFER_FAIL_PERCENTAGE: "unlimited",
+  },
+  mega: {
+    name: "Mega News Page",
+    QUOTA: "40960", // 40 GB
+    BWLIMIT: "204800", // 200 GB
+    MAXPOP: "10",
+    MAX_EMAILACCT_QUOTA: "1024",
+    MAXSQL: "10",
+    MAXADDON: "2",
+    MAXSUB: "5",
+    MAXPARK: "0",
+    MAXFTP: "3",
+    MAXLST: "0",
+    CGI: "y",
+    HASSHELL: "n",
+    CPMOD: "jupiter",
+    FEATURELIST: "default",
+    LANG: "es",
+    DIGESTAUTH: "n",
+    MAX_EMAIL_PER_HOUR: "unlimited",
+    MAX_DEFER_FAIL_PERCENTAGE: "unlimited",
+  },
+};
+
 /** The subset that every WHM accepts, for the retry when a field is rejected. */
 const CORE_PACKAGE_FIELDS = new Set([
   "quota",
@@ -368,7 +429,8 @@ async function addPackage(
   for (const [field, param] of PACKAGE_FIELDS) {
     if (onlyCore && !CORE_PACKAGE_FIELDS.has(param)) continue;
     const value = source[field];
-    if (value !== undefined && value !== "") params.set(param, value);
+    if (value === undefined || value === "") continue;
+    params.set(param, value === "0" && ZERO_MEANS_UNLIMITED.has(param) ? "unlimited" : value);
   }
 
   try {
@@ -392,30 +454,40 @@ async function addPackage(
 }
 
 export type PackageSyncAction = {
+  server: "primary" | "secondary";
   plan: string;
-  /** Full package name expected on the second reseller. */
+  /** Full package name expected on that reseller. */
   target: string;
   status: "exists" | "would-create" | "created" | "no-source" | "error";
+  /** Where the limits came from: another package, or the plan definition. */
   source?: string;
   detail?: string;
 };
 
 /**
- * Replicates the primary reseller's packages on the second one, so a fallback
- * account gets the same limits the customer paid for. A new reseller starts
- * with no packages of its own and `createacct` fails without them.
+ * Makes sure every plan has its package on both resellers.
+ *
+ * A package missing on the SECOND reseller is copied from the primary, so a
+ * fallback account gets the same limits the customer paid for (a brand-new
+ * reseller starts empty and `createacct` fails without packages). A package
+ * missing on BOTH — nothing to copy from — is built from PACKAGE_SPECS, i.e.
+ * from what the plan promises in src/lib/plans.ts.
  *
  * Dry run by default: pass `apply` to actually create anything. Idempotent —
- * a package that already exists there is left untouched, never overwritten.
+ * a package that already exists is left untouched, never overwritten.
  */
-export async function syncSecondaryPackages(opts: { apply: boolean }): Promise<{
+export async function syncPackages(opts: {
+  apply: boolean;
+  targets?: Array<"primary" | "secondary">;
+}): Promise<{
   ok: boolean;
   apply: boolean;
   error?: string;
   actions: PackageSyncAction[];
 }> {
+  const targets = opts.targets ?? ["primary", "secondary"];
   const secondary = secondaryServer();
-  if (!secondary) {
+  if (targets.includes("secondary") && !secondary) {
     return {
       ok: false,
       apply: opts.apply,
@@ -424,58 +496,83 @@ export async function syncSecondaryPackages(opts: { apply: boolean }): Promise<{
     };
   }
 
-  const [from, to] = await Promise.all([
-    listPackages(primaryServer()),
-    listPackages(secondary),
+  const primary = primaryServer();
+  const [primaryList, secondaryList] = await Promise.all([
+    listPackages(primary),
+    secondary ? listPackages(secondary) : Promise.resolve(null),
   ]);
-  if (!from.ok) {
-    return { ok: false, apply: opts.apply, error: `Primario: ${from.error}`, actions: [] };
+  if (!primaryList.ok) {
+    return { ok: false, apply: opts.apply, error: `Primario: ${primaryList.error}`, actions: [] };
   }
-  if (!to.ok) {
-    return { ok: false, apply: opts.apply, error: `Secundario: ${to.error}`, actions: [] };
+  if (secondaryList && !secondaryList.ok) {
+    return {
+      ok: false,
+      apply: opts.apply,
+      error: `Secundario: ${secondaryList.error}`,
+      actions: [],
+    };
   }
 
-  const sourceByBareName = new Map(from.packages.map((p) => [barePackageName(p.name), p]));
-  const existing = new Set(to.packages.map((p) => p.name));
+  // The primary is the reference for the second reseller; the plan definitions
+  // are the reference for whatever neither of them has.
+  const referenceByBareName = new Map(
+    primaryList.packages.map((p) => [barePackageName(p.name), p]),
+  );
   const actions: PackageSyncAction[] = [];
 
-  for (const plan of Object.keys(planToPackage)) {
-    const target = packageForPlan(plan, secondary);
-    const bare = barePackageName(target);
-    const source = sourceByBareName.get(bare);
+  for (const key of targets) {
+    const server = key === "primary" ? primary : secondary;
+    const listed = key === "primary" ? primaryList : secondaryList;
+    if (!server || !listed?.ok) continue;
 
-    if (existing.has(target)) {
-      actions.push({ plan, target, status: "exists" });
-      continue;
-    }
-    if (!source) {
-      actions.push({
-        plan,
-        target,
-        status: "no-source",
-        detail: `El primario tampoco tiene un paquete "${bare}" para copiar`,
-      });
-      continue;
-    }
-    if (!opts.apply) {
-      actions.push({ plan, target, status: "would-create", source: source.name });
-      continue;
-    }
+    const existing = new Set(listed.packages.map((p) => p.name));
 
-    let created = await addPackage(secondary, bare, source, false);
-    let detail: string | undefined;
-    if (!created.ok) {
-      // A field the other WHM does not know about rejects the whole call —
-      // retry with the limits every version accepts.
-      detail = `Reintento con campos básicos tras: ${created.error}`;
-      created = await addPackage(secondary, bare, source, true);
-    }
+    for (const plan of Object.keys(planToPackage)) {
+      const target = packageForPlan(plan, server);
+      const bare = barePackageName(target);
 
-    actions.push(
-      created.ok
-        ? { plan, target, status: "created", source: source.name, detail }
-        : { plan, target, status: "error", source: source.name, detail: created.error },
-    );
+      if (existing.has(target)) {
+        actions.push({ server: key, plan, target, status: "exists" });
+        continue;
+      }
+
+      // On the primary a same-named package cannot be the source: it is the one
+      // that is missing. Fall back to the plan definition on both servers.
+      const copied = key === "secondary" ? referenceByBareName.get(bare) : undefined;
+      const spec = PACKAGE_SPECS[plan];
+      const source = copied ?? spec;
+      const sourceLabel = copied ? copied.name : spec ? "definición del plan" : undefined;
+
+      if (!source || !sourceLabel) {
+        actions.push({
+          server: key,
+          plan,
+          target,
+          status: "no-source",
+          detail: `No hay de dónde copiar "${bare}" ni una definición en PACKAGE_SPECS`,
+        });
+        continue;
+      }
+      if (!opts.apply) {
+        actions.push({ server: key, plan, target, status: "would-create", source: sourceLabel });
+        continue;
+      }
+
+      let created = await addPackage(server, bare, source, false);
+      let detail: string | undefined;
+      if (!created.ok) {
+        // A field the other WHM does not know about rejects the whole call —
+        // retry with the limits every version accepts.
+        detail = `Reintento con campos básicos tras: ${created.error}`;
+        created = await addPackage(server, bare, source, true);
+      }
+
+      actions.push(
+        created.ok
+          ? { server: key, plan, target, status: "created", source: sourceLabel, detail }
+          : { server: key, plan, target, status: "error", source: sourceLabel, detail: created.error },
+      );
+    }
   }
 
   return { ok: actions.every((a) => a.status !== "error"), apply: opts.apply, actions };

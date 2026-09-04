@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { syncSecondaryPackages } from "@/lib/whm";
+import { syncPackages } from "@/lib/whm";
 
 function constantTimeEquals(a: string, b: string): boolean {
   const ab = Buffer.from(a);
@@ -10,18 +10,20 @@ function constantTimeEquals(a: string, b: string): boolean {
 }
 
 /**
- * Replicates the primary reseller's packages on the second one.
+ * Makes sure every plan has its WHM package on both resellers.
  *
- * A brand-new reseller has no packages of its own, and `createacct` needs one:
- * without this, the automatic fallback fails for every plan. Copying from the
- * primary keeps the limits the customer actually paid for.
+ * Missing on the second reseller → copied from the primary, so a fallback
+ * account gets the limits the customer paid for. Missing on both → created from
+ * the plan definition in src/lib/plans.ts. Without a package, `createacct`
+ * fails, which is what happens today for the "news" and "mega" plans.
  *
  * Dry run unless you pass `{"apply": true}` — the answer lists what it would
- * create. Idempotent: a package that already exists there is left alone, never
+ * create. Idempotent: a package that already exists is left alone, never
  * overwritten, so it is safe to re-run after adjusting anything by hand.
  *
  * Usage: POST /api/admin/whm-packages with `Authorization: Bearer <RESCUE_SECRET>`
- *        body {"apply": true} to write.
+ *        body {"apply": true} to write,
+ *        {"targets": ["secondary"]} to touch only one reseller.
  */
 export async function POST(req: Request) {
   const expected = process.env.RESCUE_SECRET;
@@ -37,17 +39,25 @@ export async function POST(req: Request) {
   }
 
   let apply = false;
+  let targets: Array<"primary" | "secondary"> | undefined;
   try {
-    const body = (await req.json()) as { apply?: unknown };
+    const body = (await req.json()) as { apply?: unknown; targets?: unknown };
     apply = body?.apply === true;
+    if (Array.isArray(body?.targets)) {
+      const picked = body.targets.filter(
+        (t): t is "primary" | "secondary" => t === "primary" || t === "secondary",
+      );
+      if (picked.length) targets = picked;
+    }
   } catch {
-    // No body means dry run.
+    // No body means a dry run over both resellers.
   }
 
-  const result = await syncSecondaryPackages({ apply });
+  const result = await syncPackages({ apply, targets });
 
   console.log("[admin:whm-packages] sync", {
     apply,
+    targets: targets ?? ["primary", "secondary"],
     ok: result.ok,
     error: result.error,
     created: result.actions.filter((a) => a.status === "created").length,
@@ -67,9 +77,9 @@ export async function POST(req: Request) {
           : "Simulacro: nada se creó. Repite con {\"apply\": true} para aplicarlo.",
       ...(missingSource.length
         ? {
-            warning: `Sin paquete de origen en el primario para: ${missingSource
-              .map((a) => a.plan)
-              .join(", ")}. Hay que crearlos a mano en los dos servidores o corregir el mapeo de planes.`,
+            warning: `Sin origen ni definición para: ${missingSource
+              .map((a) => `${a.plan} (${a.server})`)
+              .join(", ")}. Agrega su spec en PACKAGE_SPECS o créalos a mano.`,
           }
         : {}),
     },
