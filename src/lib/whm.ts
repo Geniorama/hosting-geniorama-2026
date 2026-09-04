@@ -266,10 +266,220 @@ export async function createCpanelAccount(
   };
 }
 
+/** A package as WHM returns it: every limit comes back as a string. */
+export type WhmPackage = Record<string, string> & { name: string };
+
 type ListPkgsResponse = {
   metadata?: { result?: 0 | 1; reason?: string };
-  data?: { pkg?: Array<{ name?: string }> };
+  data?: { pkg?: WhmPackage[] };
 };
+
+/** Package names are stored prefixed with the owning reseller ("user_Starter"). */
+function barePackageName(name: string): string {
+  return name.replace(/^[^_]*_/, "");
+}
+
+export async function listPackages(
+  server: WhmServer,
+): Promise<{ ok: true; packages: WhmPackage[] } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(`${server.apiUrl}/json-api/listpkgs?api.version=1`, {
+      method: "GET",
+      headers: { Authorization: authHeader(server) },
+      cache: "no-store",
+      signal: AbortSignal.timeout(WHM_PROBE_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { ok: false, error: `WHM HTTP ${res.status}: ${body.slice(0, 300)}` };
+    }
+    const json = (await res.json().catch(() => null)) as ListPkgsResponse | null;
+    if (json?.metadata?.result !== 1) {
+      return {
+        ok: false,
+        error: json?.metadata?.reason ?? "listpkgs devolvió un cuerpo inesperado",
+      };
+    }
+    return { ok: true, packages: (json.data?.pkg ?? []).filter((p) => Boolean(p?.name)) };
+  } catch (err) {
+    const e = err as Error;
+    return {
+      ok: false,
+      error:
+        e.name === "TimeoutError"
+          ? `El servidor no respondió en ${WHM_PROBE_TIMEOUT_MS / 1000}s — revisa el host y el puerto (:2087) y que la IP de Netlify esté permitida en el firewall.`
+          : `WHM unreachable: ${e.message}`,
+    };
+  }
+}
+
+/**
+ * Limits we copy when replicating a package on another reseller. Everything
+ * else WHM returns is either not an `addpkg` parameter (PACKAGE_TYPE) or is
+ * server-specific and would fail there — `_PACKAGE_EXTENSIONS` names plugins
+ * like magicspam that the other provider may not have installed, and `IP`
+ * refers to that server's own addresses.
+ */
+const PACKAGE_FIELDS: Array<[whmField: string, addpkgParam: string]> = [
+  ["QUOTA", "quota"],
+  ["BWLIMIT", "bwlimit"],
+  ["MAXFTP", "maxftp"],
+  ["MAXSQL", "maxsql"],
+  ["MAXPOP", "maxpop"],
+  ["MAXLST", "maxlst"],
+  ["MAXSUB", "maxsub"],
+  ["MAXPARK", "maxpark"],
+  ["MAXADDON", "maxaddon"],
+  ["CGI", "cgi"],
+  ["HASSHELL", "hasshell"],
+  ["CPMOD", "cpmod"],
+  ["FEATURELIST", "featurelist"],
+  ["MAX_EMAIL_PER_HOUR", "max_email_per_hour"],
+  ["MAX_EMAILACCT_QUOTA", "max_emailacct_quota"],
+  ["MAX_DEFER_FAIL_PERCENTAGE", "max_defer_fail_percentage"],
+  ["MAXPASSENGERAPPS", "maxpassengerapps"],
+  ["DIGESTAUTH", "digestauth"],
+  ["LANG", "language"],
+];
+
+/** The subset that every WHM accepts, for the retry when a field is rejected. */
+const CORE_PACKAGE_FIELDS = new Set([
+  "quota",
+  "bwlimit",
+  "maxftp",
+  "maxsql",
+  "maxpop",
+  "maxsub",
+  "maxpark",
+  "maxaddon",
+  "cgi",
+  "hasshell",
+  "cpmod",
+  "featurelist",
+]);
+
+async function addPackage(
+  server: WhmServer,
+  name: string,
+  source: WhmPackage,
+  onlyCore: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const params = new URLSearchParams({ "api.version": "1", name });
+  for (const [field, param] of PACKAGE_FIELDS) {
+    if (onlyCore && !CORE_PACKAGE_FIELDS.has(param)) continue;
+    const value = source[field];
+    if (value !== undefined && value !== "") params.set(param, value);
+  }
+
+  try {
+    const res = await fetch(`${server.apiUrl}/json-api/addpkg?${params.toString()}`, {
+      method: "GET",
+      headers: { Authorization: authHeader(server) },
+      cache: "no-store",
+      signal: AbortSignal.timeout(WHM_PROBE_TIMEOUT_MS),
+    });
+    const json = (await res.json().catch(() => null)) as {
+      metadata?: { result?: 0 | 1; reason?: string };
+    } | null;
+    if (!res.ok) return { ok: false, error: `WHM HTTP ${res.status}` };
+    if (json?.metadata?.result !== 1) {
+      return { ok: false, error: json?.metadata?.reason ?? "addpkg falló sin motivo" };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
+export type PackageSyncAction = {
+  plan: string;
+  /** Full package name expected on the second reseller. */
+  target: string;
+  status: "exists" | "would-create" | "created" | "no-source" | "error";
+  source?: string;
+  detail?: string;
+};
+
+/**
+ * Replicates the primary reseller's packages on the second one, so a fallback
+ * account gets the same limits the customer paid for. A new reseller starts
+ * with no packages of its own and `createacct` fails without them.
+ *
+ * Dry run by default: pass `apply` to actually create anything. Idempotent —
+ * a package that already exists there is left untouched, never overwritten.
+ */
+export async function syncSecondaryPackages(opts: { apply: boolean }): Promise<{
+  ok: boolean;
+  apply: boolean;
+  error?: string;
+  actions: PackageSyncAction[];
+}> {
+  const secondary = secondaryServer();
+  if (!secondary) {
+    return {
+      ok: false,
+      apply: opts.apply,
+      error: "El reseller secundario no está configurado (WHM2_API_URL/USER/TOKEN)",
+      actions: [],
+    };
+  }
+
+  const [from, to] = await Promise.all([
+    listPackages(primaryServer()),
+    listPackages(secondary),
+  ]);
+  if (!from.ok) {
+    return { ok: false, apply: opts.apply, error: `Primario: ${from.error}`, actions: [] };
+  }
+  if (!to.ok) {
+    return { ok: false, apply: opts.apply, error: `Secundario: ${to.error}`, actions: [] };
+  }
+
+  const sourceByBareName = new Map(from.packages.map((p) => [barePackageName(p.name), p]));
+  const existing = new Set(to.packages.map((p) => p.name));
+  const actions: PackageSyncAction[] = [];
+
+  for (const plan of Object.keys(planToPackage)) {
+    const target = packageForPlan(plan, secondary);
+    const bare = barePackageName(target);
+    const source = sourceByBareName.get(bare);
+
+    if (existing.has(target)) {
+      actions.push({ plan, target, status: "exists" });
+      continue;
+    }
+    if (!source) {
+      actions.push({
+        plan,
+        target,
+        status: "no-source",
+        detail: `El primario tampoco tiene un paquete "${bare}" para copiar`,
+      });
+      continue;
+    }
+    if (!opts.apply) {
+      actions.push({ plan, target, status: "would-create", source: source.name });
+      continue;
+    }
+
+    let created = await addPackage(secondary, bare, source, false);
+    let detail: string | undefined;
+    if (!created.ok) {
+      // A field the other WHM does not know about rejects the whole call —
+      // retry with the limits every version accepts.
+      detail = `Reintento con campos básicos tras: ${created.error}`;
+      created = await addPackage(secondary, bare, source, true);
+    }
+
+    actions.push(
+      created.ok
+        ? { plan, target, status: "created", source: source.name, detail }
+        : { plan, target, status: "error", source: source.name, detail: created.error },
+    );
+  }
+
+  return { ok: actions.every((a) => a.status !== "error"), apply: opts.apply, actions };
+}
 
 export type WhmProbe = {
   configured: boolean;
@@ -312,42 +522,11 @@ export async function whmProbe(which: "primary" | "secondary"): Promise<WhmProbe
     };
   }
 
-  let auth: { ok: boolean; detail: string };
-  let packages: string[] = [];
-  try {
-    const res = await fetch(`${server.apiUrl}/json-api/listpkgs?api.version=1`, {
-      method: "GET",
-      headers: { Authorization: authHeader(server) },
-      cache: "no-store",
-      signal: AbortSignal.timeout(WHM_PROBE_TIMEOUT_MS),
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      auth = { ok: false, detail: `WHM HTTP ${res.status}: ${body.slice(0, 300)}` };
-    } else {
-      const json = (await res.json().catch(() => null)) as ListPkgsResponse | null;
-      if (json?.metadata?.result === 1) {
-        packages = (json.data?.pkg ?? [])
-          .map((p) => p.name)
-          .filter((n): n is string => Boolean(n));
-        auth = { ok: true, detail: `${packages.length} paquetes visibles` };
-      } else {
-        auth = {
-          ok: false,
-          detail: json?.metadata?.reason ?? "listpkgs devolvió un cuerpo inesperado",
-        };
-      }
-    }
-  } catch (err) {
-    const e = err as Error;
-    auth = {
-      ok: false,
-      detail:
-        e.name === "TimeoutError"
-          ? `El servidor no respondió en ${WHM_PROBE_TIMEOUT_MS / 1000}s — revisa el host y el puerto (:2087) y que la IP de Netlify esté permitida en el firewall.`
-          : `WHM unreachable: ${e.message}`,
-    };
-  }
+  const listed = await listPackages(server);
+  const packages = listed.ok ? listed.packages.map((p) => p.name) : [];
+  const auth = listed.ok
+    ? { ok: true, detail: `${packages.length} paquetes visibles` }
+    : { ok: false, detail: listed.error };
 
   const plans = Object.keys(planToPackage).map((plan) => {
     const pkg = packageForPlan(plan, server);
