@@ -313,6 +313,41 @@ export async function listPackages(
   }
 }
 
+type PkgInfoResponse = {
+  metadata?: { result?: 0 | 1; reason?: string };
+  data?: { pkg?: Record<string, string> };
+};
+
+/**
+ * Reads one package by name.
+ *
+ * This is the authoritative "does this package exist here" check: `listpkgs`
+ * only returns the packages the authenticated reseller OWNS, so a package
+ * created for it by root — as `genioram_News Page` and `genioram_Mega News Page`
+ * turned out to be — is missing from that list while being perfectly usable in
+ * `createacct`.
+ */
+export async function getPackage(
+  server: WhmServer,
+  name: string,
+): Promise<WhmPackage | null> {
+  const params = new URLSearchParams({ "api.version": "1", pkg: name });
+  try {
+    const res = await fetch(`${server.apiUrl}/json-api/getpkginfo?${params.toString()}`, {
+      method: "GET",
+      headers: { Authorization: authHeader(server) },
+      cache: "no-store",
+      signal: AbortSignal.timeout(WHM_PROBE_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json().catch(() => null)) as PkgInfoResponse | null;
+    if (json?.metadata?.result !== 1 || !json.data?.pkg) return null;
+    return { ...json.data.pkg, name };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Limits we copy when replicating a package on another reseller. Everything
  * else WHM returns is either not an `addpkg` parameter (PACKAGE_TYPE) or is
@@ -419,11 +454,12 @@ const CORE_PACKAGE_FIELDS = new Set([
   "featurelist",
 ]);
 
-async function addPackage(
+async function writePackage(
   server: WhmServer,
   name: string,
   source: WhmPackage,
   onlyCore: boolean,
+  mode: "add" | "edit" = "add",
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const params = new URLSearchParams({ "api.version": "1", name });
   for (const [field, param] of PACKAGE_FIELDS) {
@@ -433,8 +469,10 @@ async function addPackage(
     params.set(param, value === "0" && ZERO_MEANS_UNLIMITED.has(param) ? "unlimited" : value);
   }
 
+  const endpoint = mode === "edit" ? "editpkg" : "addpkg";
+
   try {
-    const res = await fetch(`${server.apiUrl}/json-api/addpkg?${params.toString()}`, {
+    const res = await fetch(`${server.apiUrl}/json-api/${endpoint}?${params.toString()}`, {
       method: "GET",
       headers: { Authorization: authHeader(server) },
       cache: "no-store",
@@ -445,7 +483,7 @@ async function addPackage(
     } | null;
     if (!res.ok) return { ok: false, error: `WHM HTTP ${res.status}` };
     if (json?.metadata?.result !== 1) {
-      return { ok: false, error: json?.metadata?.reason ?? "addpkg falló sin motivo" };
+      return { ok: false, error: json?.metadata?.reason ?? `${endpoint} falló sin motivo` };
     }
     return { ok: true };
   } catch (err) {
@@ -458,7 +496,14 @@ export type PackageSyncAction = {
   plan: string;
   /** Full package name expected on that reseller. */
   target: string;
-  status: "exists" | "would-create" | "created" | "no-source" | "error";
+  status:
+    | "exists"
+    | "would-create"
+    | "created"
+    | "would-align"
+    | "aligned"
+    | "no-source"
+    | "error";
   /** Where the limits came from: another package, or the plan definition. */
   source?: string;
   detail?: string;
@@ -479,6 +524,12 @@ export type PackageSyncAction = {
 export async function syncPackages(opts: {
   apply: boolean;
   targets?: Array<"primary" | "secondary">;
+  /**
+   * Rewrite the second reseller's packages with the primary's limits, instead
+   * of leaving whatever is already there. For repairing a package that was
+   * created from an outdated source.
+   */
+  overwrite?: boolean;
 }): Promise<{
   ok: boolean;
   apply: boolean;
@@ -497,51 +548,64 @@ export async function syncPackages(opts: {
   }
 
   const primary = primaryServer();
-  const [primaryList, secondaryList] = await Promise.all([
-    listPackages(primary),
-    secondary ? listPackages(secondary) : Promise.resolve(null),
-  ]);
-  if (!primaryList.ok) {
-    return { ok: false, apply: opts.apply, error: `Primario: ${primaryList.error}`, actions: [] };
-  }
-  if (secondaryList && !secondaryList.ok) {
-    return {
-      ok: false,
-      apply: opts.apply,
-      error: `Secundario: ${secondaryList.error}`,
-      actions: [],
-    };
-  }
+  const plans = Object.keys(planToPackage);
 
-  // The primary is the reference for the second reseller; the plan definitions
-  // are the reference for whatever neither of them has.
-  const referenceByBareName = new Map(
-    primaryList.packages.map((p) => [barePackageName(p.name), p]),
+  // Read each package by name instead of listing: listpkgs hides the ones the
+  // reseller does not own, which is how "genioram_News Page" looked missing
+  // while createacct would have accepted it.
+  const reference = new Map<string, WhmPackage | null>(
+    await Promise.all(
+      plans.map(
+        async (plan) =>
+          [plan, await getPackage(primary, packageForPlan(plan, primary))] as const,
+      ),
+    ),
   );
   const actions: PackageSyncAction[] = [];
 
   for (const key of targets) {
     const server = key === "primary" ? primary : secondary;
-    const listed = key === "primary" ? primaryList : secondaryList;
-    if (!server || !listed?.ok) continue;
+    if (!server) continue;
 
-    const existing = new Set(listed.packages.map((p) => p.name));
-
-    for (const plan of Object.keys(planToPackage)) {
+    for (const plan of plans) {
       const target = packageForPlan(plan, server);
       const bare = barePackageName(target);
 
-      if (existing.has(target)) {
-        actions.push({ server: key, plan, target, status: "exists" });
-        continue;
-      }
-
-      // On the primary a same-named package cannot be the source: it is the one
-      // that is missing. Fall back to the plan definition on both servers.
-      const copied = key === "secondary" ? referenceByBareName.get(bare) : undefined;
+      // The primary is the reference for the second reseller; the plan
+      // definition covers whatever neither of them has.
+      const copied = key === "secondary" ? reference.get(plan) : undefined;
       const spec = PACKAGE_SPECS[plan];
       const source = copied ?? spec;
       const sourceLabel = copied ? copied.name : spec ? "definición del plan" : undefined;
+
+      const current = key === "primary" ? reference.get(plan) : await getPackage(server, target);
+
+      if (current) {
+        // Only the second reseller can be realigned, and only against the
+        // primary: the primary itself has no reference to be aligned to.
+        if (!opts.overwrite || key === "primary" || !copied) {
+          actions.push({ server: key, plan, target, status: "exists" });
+          continue;
+        }
+        if (!opts.apply) {
+          actions.push({ server: key, plan, target, status: "would-align", source: copied.name });
+          continue;
+        }
+        const edited = await writePackage(server, target, copied, false, "edit");
+        actions.push(
+          edited.ok
+            ? { server: key, plan, target, status: "aligned", source: copied.name }
+            : {
+                server: key,
+                plan,
+                target,
+                status: "error",
+                source: copied.name,
+                detail: edited.error,
+              },
+        );
+        continue;
+      }
 
       if (!source || !sourceLabel) {
         actions.push({
@@ -558,13 +622,13 @@ export async function syncPackages(opts: {
         continue;
       }
 
-      let created = await addPackage(server, bare, source, false);
+      let created = await writePackage(server, bare, source, false);
       let detail: string | undefined;
       if (!created.ok) {
         // A field the other WHM does not know about rejects the whole call —
         // retry with the limits every version accepts.
         detail = `Reintento con campos básicos tras: ${created.error}`;
-        created = await addPackage(server, bare, source, true);
+        created = await writePackage(server, bare, source, true);
       }
 
       actions.push(
@@ -622,13 +686,24 @@ export async function whmProbe(which: "primary" | "secondary"): Promise<WhmProbe
   const listed = await listPackages(server);
   const packages = listed.ok ? listed.packages.map((p) => p.name) : [];
   const auth = listed.ok
-    ? { ok: true, detail: `${packages.length} paquetes visibles` }
+    ? { ok: true, detail: `${packages.length} paquetes propios del reseller` }
     : { ok: false, detail: listed.error };
 
-  const plans = Object.keys(planToPackage).map((plan) => {
-    const pkg = packageForPlan(plan, server);
-    return { plan, package: pkg, exists: packages.includes(pkg) };
-  });
+  // `exists` comes from reading each package by name, not from the list above:
+  // listpkgs only returns what the reseller owns, so a package created for it
+  // by root is absent there while createacct accepts it perfectly.
+  const plans = auth.ok
+    ? await Promise.all(
+        Object.keys(planToPackage).map(async (plan) => {
+          const pkg = packageForPlan(plan, server);
+          return { plan, package: pkg, exists: (await getPackage(server, pkg)) !== null };
+        }),
+      )
+    : Object.keys(planToPackage).map((plan) => ({
+        plan,
+        package: packageForPlan(plan, server),
+        exists: false,
+      }));
 
   return { configured: true, server: which, apiUrl: server.apiUrl, auth, packages, plans };
 }
