@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { orderStore } from "@/lib/order-store";
-import { completeProvisioning, packageForPlan } from "@/lib/whm";
+import { completeProvisioning, packageForPlan, secondaryDefaults } from "@/lib/whm";
 
 function constantTimeEquals(a: string, b: string): boolean {
   const ab = Buffer.from(a);
@@ -24,11 +24,16 @@ function constantTimeEquals(a: string, b: string): boolean {
  *   orderId: string,        // required
  *   username: string,       // required — cPanel username you created
  *   password: string,       // required — password you assigned
+ *   server?: "primary"|"secondary", // which reseller holds it (default "secondary":
+ *                           // that is why you are here). Picks the package map and
+ *                           // the WHM2_NS1/NS2 + WHM2_PANEL_URL defaults for the email.
  *   ip?: string,            // server IP of the reseller (recommended)
  *   domain?: string,        // defaults to the order's hosting domain
- *   package?: string,       // defaults to packageForPlan(order plan)
- *   panel?: "cpanel"|"plesk", // control panel for the credentials email (default "cpanel")
- *   ns1?: string, ns2?: string, // nameservers for the email (optional)
+ *   package?: string,       // defaults to packageForPlan(order plan, server)
+ *   panel?: "cpanel"|"plesk", // control panel for the credentials email (default "cpanel";
+ *                           // "plesk" is only kept for accounts from the old secondary provider)
+ *   ns1?: string, ns2?: string, // nameservers for the email (override the server defaults)
+ *   panelUrl?: string,      // override the panel login URL in the email (optional)
  *   webmailUrl?: string,    // override webmail URL in the email (optional)
  *   showNameservers?: boolean, // include the nameserver section (default: true cPanel / false Plesk)
  *   skipEmail?: boolean,    // don't send the credentials email (e.g. retrying a failed tickets sync)
@@ -52,12 +57,14 @@ export async function POST(req: Request) {
     orderId?: unknown;
     username?: unknown;
     password?: unknown;
+    server?: unknown;
     ip?: unknown;
     domain?: unknown;
     package?: unknown;
     panel?: unknown;
     ns1?: unknown;
     ns2?: unknown;
+    panelUrl?: unknown;
     webmailUrl?: unknown;
     showNameservers?: unknown;
     skipEmail?: unknown;
@@ -76,8 +83,18 @@ export async function POST(req: Request) {
   const domainOverride = typeof body.domain === "string" ? body.domain.trim() : "";
   const packageOverride = typeof body.package === "string" ? body.package.trim() : "";
   const panel = body.panel === "plesk" ? "plesk" : "cpanel";
-  const ns1 = typeof body.ns1 === "string" && body.ns1.trim() ? body.ns1.trim() : undefined;
-  const ns2 = typeof body.ns2 === "string" && body.ns2.trim() ? body.ns2.trim() : undefined;
+  // An account created by hand almost always lives in the second reseller —
+  // that is the scenario this endpoint exists for.
+  const server = body.server === "primary" ? "primary" : "secondary";
+  const defaults = server === "secondary" ? secondaryDefaults() : {};
+  const ns1 =
+    typeof body.ns1 === "string" && body.ns1.trim() ? body.ns1.trim() : defaults.ns1;
+  const ns2 =
+    typeof body.ns2 === "string" && body.ns2.trim() ? body.ns2.trim() : defaults.ns2;
+  const panelUrl =
+    typeof body.panelUrl === "string" && body.panelUrl.trim()
+      ? body.panelUrl.trim()
+      : defaults.panelUrl;
   const webmailUrl =
     typeof body.webmailUrl === "string" && body.webmailUrl.trim()
       ? body.webmailUrl.trim()
@@ -127,7 +144,7 @@ export async function POST(req: Request) {
   }
 
   const domain = domainOverride || order.payload.hosting.domain;
-  const pkg = packageOverride || packageForPlan(order.payload.planId);
+  const pkg = packageOverride || packageForPlan(order.payload.planId, { key: server });
 
   console.log("[admin:complete] completing manual provisioning", {
     order: orderId,
@@ -135,6 +152,7 @@ export async function POST(req: Request) {
     domain,
     package: pkg,
     panel,
+    server,
     force,
     skipEmail,
   });
@@ -149,10 +167,13 @@ export async function POST(req: Request) {
         password,
         package: pkg,
         ip,
-        raw: { source: "manual", reseller: "external", panel },
+        raw: { source: "manual", reseller: server, panel },
       },
-      { panel, ns1, ns2, webmailUrl, showNameservers },
-      { skipCredentialsEmail: skipEmail, provider: "manual" },
+      { panel, ns1, ns2, panelUrl, webmailUrl, showNameservers },
+      {
+        skipCredentialsEmail: skipEmail,
+        provider: server === "secondary" ? "whm2-manual" : "manual",
+      },
     );
   } catch (err) {
     console.error("[admin:complete] completeProvisioning threw", err);
@@ -170,5 +191,8 @@ export async function POST(req: Request) {
     package: pkg,
     ip: ip ?? null,
     panel,
+    server,
+    ns1: ns1 ?? null,
+    ns2: ns2 ?? null,
   });
 }

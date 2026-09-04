@@ -585,7 +585,7 @@ export function CheckoutForm({ planId, billing, couponCode }: CheckoutFormProps)
         {form.domainOwnership === "owned" ? (
           <p className="text-muted" style={{ fontSize: "0.8rem", margin: "-0.4rem 0 0" }}>
             Sin <code>http://</code> ni <code>www.</code>. Crearemos tu cuenta de hosting
-            (cPanel o Plesk) apuntando a este dominio.
+            (cPanel) apuntando a este dominio.
           </p>
         ) : (
           <div className="domain-ownership-note">

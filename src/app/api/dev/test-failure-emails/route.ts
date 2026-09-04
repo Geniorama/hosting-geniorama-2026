@@ -13,8 +13,9 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const customer = url.searchParams.get("to") ?? "test@example.com";
   const reason = url.searchParams.get("reason") ?? "Sorry, the disk is full";
-  // ?panel=plesk previews the "reseller lleno, créala a mano en Plesk" variant.
-  const manualPanel = url.searchParams.get("panel") === "plesk" ? "plesk" : undefined;
+  // ?manual=1 previews the "reseller primario lleno, créala a mano en el segundo
+  // WHM" work order instead of the generic failure alert.
+  const manualFallback = url.searchParams.get("manual") === "1";
 
   const fakeOrder: Order = {
     id: `DEV-${Date.now().toString(36).toUpperCase()}`,
@@ -50,7 +51,7 @@ export async function GET(req: Request) {
   };
 
   const [alert, notice] = await Promise.all([
-    sendProvisioningFailureAlert(fakeOrder, reason, manualPanel ? { manualPanel } : undefined),
+    sendProvisioningFailureAlert(fakeOrder, reason, manualFallback ? { manualFallback } : undefined),
     sendProvisioningDelayedNotice(fakeOrder),
   ]);
 

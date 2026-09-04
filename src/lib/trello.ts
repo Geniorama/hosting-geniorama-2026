@@ -77,6 +77,23 @@ function buildCardDescription(order: Order): string {
         : "No responsable de IVA"
       : "Persona natural";
 
+  const resellerLabel = (provider?: string) => {
+    switch (provider) {
+      case "whm":
+        return "primario (automático)";
+      case "whm2":
+        return "secundario (automático)";
+      case "whm2-manual":
+        return "secundario (creado a mano)";
+      case "manual":
+        return "primario (creado a mano)";
+      case "plesk":
+        return "Plesk (proveedor anterior)";
+      default:
+        return provider ?? "—";
+    }
+  };
+
   return [
     `**Concepto:** ${buildConceptLine(order)}`,
     `**Valor:** ${formatValue(order.amount)}`,
@@ -111,9 +128,8 @@ function buildCardDescription(order: Order): string {
     ``,
     order.provisioning
       ? [
-          `**Panel:** ${order.provisioning.panel === "plesk" ? "Plesk" : "cPanel"}${
-            order.provisioning.provider ? ` (${order.provisioning.provider})` : ""
-          }`,
+          `**Panel:** ${order.provisioning.panel === "plesk" ? "Plesk" : "cPanel"}`,
+          `**Reseller:** ${resellerLabel(order.provisioning.provider)}`,
           `**Usuario:** \`${order.provisioning.username}\``,
           `**${order.provisioning.panel === "plesk" ? "Service plan" : "Paquete WHM"}:** ${
             order.provisioning.package

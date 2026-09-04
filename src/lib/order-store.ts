@@ -11,11 +11,15 @@ export type ProvisioningInfo = {
   ip?: string;
   provisionedAt: number;
   /**
-   * Control panel the account lives on. Optional because records written before
-   * the Plesk reseller existed have no value — treat a missing panel as cPanel.
+   * Control panel the account lives on. Optional because older records have no
+   * value — treat a missing panel as cPanel. Both resellers run WHM now, so
+   * "plesk" only survives on accounts created while the secondary used it.
    */
   panel?: PanelType;
-  /** Which reseller created it: "whm", "plesk", or "manual". */
+  /**
+   * Which reseller created it: "whm" (primary), "whm2" (secondary), or the
+   * manual variants "manual" / "whm2-manual" from /api/admin/complete-order.
+   */
   provider?: string;
 };
 

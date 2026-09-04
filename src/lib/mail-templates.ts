@@ -8,15 +8,22 @@ export const escape = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 export type CredentialsPresentation = {
-  /** Control panel the account lives on. Defaults to "cpanel". */
+  /**
+   * Control panel the account lives on. Defaults to "cpanel" — both resellers
+   * run WHM now, so "plesk" only shows up for accounts created back when the
+   * secondary provider used it, or when /api/admin/complete-order is told so.
+   */
   panel?: PanelType;
   /**
-   * Override the panel login URL. Worth setting for a Plesk reseller: the
-   * provider's server hostname has a valid certificate and works before the
-   * domain resolves, unlike the default https://<domain>:8443.
+   * Override the panel login URL. Worth setting for the second reseller: its
+   * server hostname has a valid certificate and works before the domain
+   * resolves, unlike the default https://<domain>:2083.
    */
   panelUrl?: string;
-  /** Override nameservers (defaults to HOSTING_NS1/NS2 env or cPanel defaults). */
+  /**
+   * Override nameservers (defaults to HOSTING_NS1/NS2, i.e. the primary
+   * reseller's). An account on the second reseller must carry its own.
+   */
   ns1?: string;
   ns2?: string;
   /** Override the webmail URL (defaults per panel type). */
@@ -228,12 +235,12 @@ export async function sendProvisioningFailureAlert(
   errorMessage: string,
   opts?: {
     /**
-     * Set to "plesk" when the primary reseller is full and the account has to
-     * be created by hand in the Plesk reseller. Turns the alert into a work
-     * order — steps plus the ready-to-run /api/admin/complete-order call —
-     * instead of a generic failure.
+     * Set when the primary reseller is full and the account has to be created
+     * by hand in the second reseller. Turns the alert into a work order — steps
+     * plus the ready-to-run /api/admin/complete-order call — instead of a
+     * generic failure.
      */
-    manualPanel?: PanelType;
+    manualFallback?: boolean;
   },
 ) {
   const ops = getOpsRecipients();
@@ -249,7 +256,7 @@ export async function sendProvisioningFailureAlert(
     `${order.payload.contact.firstName} ${order.payload.contact.lastName}`.trim();
   const domain = order.payload.hosting.domain;
 
-  const manualPlesk = opts?.manualPanel === "plesk";
+  const manualFallback = opts?.manualFallback === true;
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "https://hosting.geniorama.co";
 
   const completeOrderCall = [
@@ -257,12 +264,12 @@ export async function sendProvisioningFailureAlert(
     `  -H "Authorization: Bearer $RESCUE_SECRET" \\`,
     `  -H "Content-Type: application/json" \\`,
     `  -d '{"orderId":"${order.id}","username":"USUARIO","password":"CLAVE",`,
-    `       "panel":"plesk","ip":"IP_DEL_SERVIDOR",`,
-    `       "ns1":"NS1_DEL_PROVEEDOR","ns2":"NS2_DEL_PROVEEDOR"}'`,
+    `       "ip":"IP_DEL_SERVIDOR",`,
+    `       "ns1":"NS1_DEL_SEGUNDO_RESELLER","ns2":"NS2_DEL_SEGUNDO_RESELLER"}'`,
   ].join("\n");
 
-  const subject = manualPlesk
-    ? `[ACCIÓN] Pedido ${order.id} — crear cuenta manual en Plesk`
+  const subject = manualFallback
+    ? `[ACCIÓN] Pedido ${order.id} — crear cuenta manual en el segundo reseller`
     : `[ALERTA] Pedido ${order.id} pagado pero NO aprovisionado`;
 
   const html = `<!DOCTYPE html>
@@ -271,14 +278,14 @@ export async function sendProvisioningFailureAlert(
 <body style="margin:0;padding:0;background:#fff;font-family:Consolas,Menlo,monospace;color:#1f2333;font-size:13px;line-height:1.6;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px;">
     <tr><td>
-      <div style="background:${manualPlesk ? "#b45309" : "#b91c1c"};color:#fff;padding:14px 18px;border-radius:8px 8px 0 0;font-family:Arial,Helvetica,sans-serif;font-weight:800;font-size:16px;">
-        ${manualPlesk ? "⚠ Reseller cPanel lleno — crear la cuenta en Plesk" : "⚠ Aprovisionamiento fallido — acción requerida"}
+      <div style="background:${manualFallback ? "#b45309" : "#b91c1c"};color:#fff;padding:14px 18px;border-radius:8px 8px 0 0;font-family:Arial,Helvetica,sans-serif;font-weight:800;font-size:16px;">
+        ${manualFallback ? "⚠ Reseller primario lleno — crear la cuenta en el segundo WHM" : "⚠ Aprovisionamiento fallido — acción requerida"}
       </div>
       <div style="background:#fff7ed;border:1px solid #fed7aa;border-top:none;padding:18px;border-radius:0 0 8px 8px;">
         <p style="margin:0 0 12px;font-family:Arial,Helvetica,sans-serif;font-size:14px;">
           ${
-            manualPlesk
-              ? `El cliente ya pagó y el <strong>reseller de cPanel no aceptó la cuenta</strong>. Créala a mano en el <strong>reseller de Plesk</strong> y luego corre el comando de abajo: el sistema se encarga del resto (credenciales al cliente, tickets y tarjeta de Trello).`
+            manualFallback
+              ? `El cliente ya pagó y el <strong>reseller primario no aceptó la cuenta</strong>. Créala a mano en el <strong>WHM del segundo reseller</strong> y luego corre el comando de abajo: el sistema se encarga del resto (credenciales al cliente, tickets y tarjeta de Trello).`
               : `El cliente ya pagó pero <strong>WHM rechazó la creación de la cuenta cPanel</strong>. Hay que crearla a mano o contactar al cliente para reembolso.`
           }
         </p>
@@ -296,15 +303,15 @@ export async function sendProvisioningFailureAlert(
         </table>
 
         <div style="margin-top:18px;padding:12px 14px;background:#1f2333;color:#fca5a5;border-radius:6px;font-family:Consolas,Menlo,monospace;">
-          <div style="color:#fbbf24;font-weight:700;margin-bottom:6px;">${manualPlesk ? "Motivo del rechazo en WHM:" : "Error WHM:"}</div>
+          <div style="color:#fbbf24;font-weight:700;margin-bottom:6px;">${manualFallback ? "Motivo del rechazo en WHM:" : "Error WHM:"}</div>
           ${escape(errorMessage)}
         </div>
 
         ${
-          manualPlesk
+          manualFallback
             ? `<p style="margin:18px 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#3a3f59;">
           <strong>Próximos pasos:</strong><br>
-          1. Entra al reseller de <strong>Plesk</strong> y crea la suscripción para <strong>${escape(domain)}</strong> con el service plan equivalente al plan de arriba.<br>
+          1. Entra al <strong>WHM del segundo reseller</strong> y crea la cuenta para <strong>${escape(domain)}</strong> con el paquete equivalente al plan de arriba.<br>
           2. Anota el usuario, la contraseña y la IP del servidor.<br>
           3. Corre este comando — envía credenciales al cliente, sincroniza con tickets y crea la tarjeta de Trello:
         </p>
@@ -326,8 +333,8 @@ export async function sendProvisioningFailureAlert(
 </body></html>`;
 
   const text = [
-    manualPlesk
-      ? `ACCIÓN: Pedido ${order.id} — el reseller de cPanel está lleno, crear la cuenta en Plesk.`
+    manualFallback
+      ? `ACCIÓN: Pedido ${order.id} — el reseller primario está lleno, crear la cuenta en el segundo WHM.`
       : `ALERTA: Pedido ${order.id} pagado pero NO aprovisionado.`,
     ``,
     `Plan: ${order.payload.planId} (${order.payload.billing})`,
@@ -337,12 +344,12 @@ export async function sendProvisioningFailureAlert(
     `Pago Wompi: ${order.paymentRef ?? "—"}`,
     `Monto: $${order.amount.toLocaleString("es-CO")} COP`,
     ``,
-    manualPlesk ? `Motivo del rechazo en WHM:` : `Error WHM:`,
+    manualFallback ? `Motivo del rechazo en WHM:` : `Error WHM:`,
     `  ${errorMessage}`,
     ``,
-    ...(manualPlesk
+    ...(manualFallback
       ? [
-          `1. Crea la suscripción en el reseller de Plesk para ${domain}.`,
+          `1. Crea la cuenta en el WHM del segundo reseller para ${domain}.`,
           `2. Anota usuario, contraseña e IP.`,
           `3. Corre:`,
           ``,

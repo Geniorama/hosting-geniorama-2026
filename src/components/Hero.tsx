@@ -19,7 +19,7 @@ export function Hero() {
             <span className="accent">siempre online.</span>
           </h1>
           <p className="hero-subtitle">
-            Hosting SSD con cPanel o Plesk, asistencia 24/7 y planes pensados para WordPress,
+            Hosting SSD con cPanel, asistencia 24/7 y planes pensados para WordPress,
             e-commerce y campañas publicitarias. Pesos colombianos, sin sorpresas.
           </p>
           <div className="hero-actions">

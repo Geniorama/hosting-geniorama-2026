@@ -20,7 +20,7 @@ const TRUST = [
   { title: "Migración gratis", detail: "Traemos tu sitio, correos y bases de datos sin costo." },
   { title: "Soporte 24/7", detail: "Sistema de tickets con seguimiento, atendido por personas." },
   { title: "Precios en pesos", detail: "Sin cobros en dólares y servicio exento de IVA." },
-  { title: "cPanel o Plesk", detail: "El panel que prefieras, con SSL y respaldos incluidos." },
+  { title: "cPanel incluido", detail: "El panel más usado del mercado, con SSL y respaldos incluidos." },
 ];
 
 const FAQ = [

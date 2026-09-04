@@ -27,8 +27,8 @@ const features: Feature[] = [
     ),
   },
   {
-    title: "cPanel o Plesk incluido",
-    desc: "Panel de control intuitivo —cPanel o Plesk, según el servidor— para administrar dominios, correos, bases de datos y archivos sin tecnicismos.",
+    title: "cPanel incluido",
+    desc: "Panel de control intuitivo —cPanel, el estándar del sector— para administrar dominios, correos, bases de datos y archivos sin tecnicismos.",
     icon: (
       <svg
         width="22"
