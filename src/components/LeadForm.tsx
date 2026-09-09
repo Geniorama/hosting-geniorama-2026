@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { AdvisorPlanPick } from "@/lib/advisor";
+import { trackPixel } from "@/lib/meta-pixel";
 import type { ChatTurn } from "./AdvisorChat";
 
 type LeadFormProps = {
@@ -101,6 +102,10 @@ export function LeadForm({ pick, source, getConversation, getUtm, onSent }: Lead
     setError(null);
     setSending(true);
 
+    // El mismo id viaja al servidor y al pixel: Meta recibe el Contact por los
+    // dos caminos y con esto lo cuenta una sola vez.
+    const eventId = crypto.randomUUID();
+
     try {
       const res = await fetch("/api/leads", {
         method: "POST",
@@ -115,6 +120,7 @@ export function LeadForm({ pick, source, getConversation, getUtm, onSent }: Lead
           source,
           conversation: getConversation(),
           utm: getUtm(),
+          eventId,
         }),
       });
       const data = (await res.json()) as { ok: boolean; error?: string };
@@ -123,6 +129,19 @@ export function LeadForm({ pick, source, getConversation, getUtm, onSent }: Lead
         setError(data.error ?? "No pudimos guardar tus datos. Intenta de nuevo.");
         return;
       }
+
+      trackPixel(
+        "Contact",
+        {
+          currency: "COP",
+          value: pick.billing === "annual" ? pick.annual : pick.monthly,
+          content_name: pick.name,
+          content_ids: [pick.planId],
+          content_category: pick.categoryLabel,
+          lead_source: source,
+        },
+        eventId,
+      );
 
       setSent(true);
       onSent?.();

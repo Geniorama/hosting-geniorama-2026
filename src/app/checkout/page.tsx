@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { CheckoutBody } from "@/components/CheckoutBody";
+import { CheckoutTracker } from "@/components/CheckoutTracker";
 import { plans } from "@/lib/plans";
 
 type SearchParams = Promise<{ plan?: string; billing?: string }>;
@@ -22,8 +23,17 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Sea
 
   const billingMode: "monthly" | "annual" = billing === "monthly" ? "monthly" : "annual";
 
+  const isAdsPlan = plans.ads.some((p) => p.id === plan.id);
+
   return (
     <>
+      <CheckoutTracker
+        planId={plan.id}
+        planName={plan.name}
+        category={isAdsPlan ? "Hosting Ads" : "Hosting Web"}
+        billing={billingMode}
+        value={billingMode === "annual" ? plan.price.annual : plan.price.monthly}
+      />
       <Header />
       <main className="checkout-page">
         <div className="container-page">

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { planPick, type Billing } from "@/lib/advisor";
 import { saveLead, type LeadConversationTurn } from "@/lib/lead-store";
 import { sendLeadAlert, sendLeadRecommendation } from "@/lib/mail-leads";
+import { trackContact, trackingFromHeaders } from "@/lib/meta-events";
 import { clientKey, rateLimited } from "@/lib/rate-limit";
 
 const RATE_WINDOW_MS = 10 * 60_000;
@@ -112,6 +113,10 @@ export async function POST(req: Request) {
   const source = str(body.source, 40) || "asesor-landing";
   const conversation = parseConversation(body.conversation);
   const utm = parseUtm(body.utm);
+  // Lo genera el navegador antes de disparar su propio evento Contact. Si no
+  // llega (JS bloqueado, pixel apagado) inventamos uno: el evento igual sale
+  // por la API de conversiones, solo que sin nada que deduplicar.
+  const eventId = str(body.eventId, 64) || crypto.randomUUID();
 
   const saved = await saveLead({
     name,
@@ -144,6 +149,17 @@ export async function POST(req: Request) {
   const [alert, recommendation] = await Promise.allSettled([
     sendLeadAlert(lead),
     pick ? sendLeadRecommendation(lead) : Promise.resolve({ ok: false as const, error: "sin plan" }),
+    // Meta va en el mismo lote: nunca rechaza, así que no altera el resultado.
+    trackContact({
+      eventId,
+      name,
+      email,
+      phone,
+      planId: pick?.planId,
+      value: pick ? (billing === "annual" ? pick.annual : pick.monthly) : undefined,
+      source,
+      tracking: trackingFromHeaders(req.headers, req.headers.get("referer") ?? undefined),
+    }),
   ]);
 
   const alertSent = alert.status === "fulfilled" && alert.value.ok;

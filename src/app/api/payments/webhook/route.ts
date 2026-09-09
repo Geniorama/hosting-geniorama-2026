@@ -6,6 +6,7 @@ import {
 } from "@/lib/paymentsway";
 import { orderStore, type OrderStatus } from "@/lib/order-store";
 import { handlePaidOrder } from "@/lib/renewals";
+import { trackPurchase } from "@/lib/meta-events";
 
 const statusMap: Record<number, OrderStatus> = {
   [PaymentsWayStatus.SUCCESS]: "success",
@@ -58,6 +59,10 @@ export async function POST(req: Request) {
     });
 
     if (newStatus === "success") {
+      // El event_id lleva el id del pedido: si PaymentsWay reenvía el aviso, la
+      // conversión sigue contando una sola vez.
+      await trackPurchase(updated);
+
       try {
         await handlePaidOrder(updated);
       } catch (err) {

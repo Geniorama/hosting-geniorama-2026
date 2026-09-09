@@ -6,6 +6,7 @@ import {
 } from "@/lib/wompi";
 import { orderStore } from "@/lib/order-store";
 import { handlePaidOrder } from "@/lib/renewals";
+import { trackPurchase } from "@/lib/meta-events";
 
 export async function POST(req: Request) {
   let payload: WompiEventPayload;
@@ -46,6 +47,11 @@ export async function POST(req: Request) {
       });
 
       if (newStatus === "success") {
+        // Primero Meta: es rápido y no depende de que el aprovisionamiento
+        // salga bien. El event_id lleva el id del pedido, así que los
+        // reintentos de Wompi no cuentan la conversión dos veces.
+        await trackPurchase(updated);
+
         try {
           await handlePaidOrder(updated);
         } catch (err) {

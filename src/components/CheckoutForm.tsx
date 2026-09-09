@@ -11,6 +11,7 @@ import {
 } from "@/lib/checkout";
 import { submitCheckout } from "@/app/checkout/actions";
 import { citiesByDepartment } from "@/lib/colombia-cities";
+import { trackPixel } from "@/lib/meta-pixel";
 import { PrivacidadContent, TerminosContent } from "./LegalContent";
 
 type CheckoutFormProps = {
@@ -152,6 +153,25 @@ export function CheckoutForm({ planId, billing, couponCode }: CheckoutFormProps)
       const result = await submitCheckout(payload);
       if (result.ok) {
         setErrors({});
+
+        // "Agregar información de pago". El servidor manda el mismo evento con
+        // este mismo id; si el navegador alcanza a soltarlo antes del redirect,
+        // Meta los une en uno.
+        trackPixel(
+          "AddPaymentInfo",
+          {
+            currency: "COP",
+            value: result.amount,
+            content_type: "product",
+            content_ids: [planId],
+            contents: [{ id: planId, quantity: 1, item_price: result.amount }],
+            num_items: 1,
+            billing,
+            order_id: result.orderId,
+          },
+          result.metaEventId,
+        );
+
         setRedirecting({ orderId: result.orderId });
         submitToProvider(
           result.payment.url,

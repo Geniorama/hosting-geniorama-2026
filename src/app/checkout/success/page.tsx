@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { PurchaseTracker } from "@/components/PurchaseTracker";
 import { orderStore } from "@/lib/order-store";
+import { purchaseEventId } from "@/lib/meta-events";
+import { plans } from "@/lib/plans";
 
 type SearchParams = Promise<{ order?: string; status?: string }>;
 
@@ -56,8 +59,25 @@ export default async function CheckoutSuccessPage({
       : "unknown";
   const meta = statusMeta[statusKey];
 
+  // Refuerzo del Purchase desde el navegador. El que cuenta de verdad sale del
+  // webhook; este comparte eventId para que Meta no los sume dos veces.
+  const paidPlan =
+    order?.status === "success"
+      ? [...plans.web, ...plans.ads].find((p) => p.id === order.payload.planId)
+      : undefined;
+
   return (
     <>
+      {order && order.status === "success" && (
+        <PurchaseTracker
+          eventId={purchaseEventId(order.id)}
+          orderId={order.id}
+          value={order.amount}
+          currency="COP"
+          planId={order.payload.planId}
+          planName={paidPlan?.name ?? order.payload.planId}
+        />
+      )}
       <Header />
       <main className="checkout-page">
         <div className="container-page">

@@ -47,6 +47,23 @@ export const departments = [
 
 export type PaymentProvider = "paymentsway" | "wompi";
 
+/**
+ * Señales de Meta capturadas al crear el pedido. Se guardan dentro del payload
+ * (jsonb, sin migración) porque el evento Purchase sale mucho después, desde el
+ * webhook de la pasarela, donde ya no hay ni cookies ni navegador del cliente.
+ * Las llena el servidor en submitCheckout: el cliente nunca las manda.
+ */
+export type CheckoutTracking = {
+  /** Cookie _fbp del pixel. */
+  fbp?: string;
+  /** Cookie _fbc: el clic del anuncio. Es la que más sube el emparejamiento. */
+  fbc?: string;
+  clientIp?: string;
+  userAgent?: string;
+  /** URL donde estaba el cliente cuando envió el formulario. */
+  sourceUrl?: string;
+};
+
 export type CheckoutPayload = {
   planId: string;
   billing: "monthly" | "annual";
@@ -79,6 +96,7 @@ export type CheckoutPayload = {
   };
   notes?: string;
   couponCode?: string;
+  tracking?: CheckoutTracking;
 };
 
 export function isValidDomain(value: string): boolean {

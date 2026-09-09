@@ -1,11 +1,18 @@
 "use server";
 
+import { headers } from "next/headers";
+import { after } from "next/server";
 import { isValidDomain, type CheckoutPayload, type CheckoutResult } from "@/lib/checkout";
 import { plans } from "@/lib/plans";
 import { buildPaymentForm, type PaymentsWayFormFields } from "@/lib/paymentsway";
 import { buildWompiForm, type WompiFormFields } from "@/lib/wompi";
 import { orderStore } from "@/lib/order-store";
 import { applyCoupon, redeemCoupon, type AppliedCoupon } from "@/lib/coupons";
+import {
+  addPaymentInfoEventId,
+  trackAddPaymentInfo,
+  trackingFromHeaders,
+} from "@/lib/meta-events";
 
 export type ValidateCouponResult =
   | { ok: true; coupon: AppliedCoupon }
@@ -30,6 +37,10 @@ export type CheckoutSuccess = {
   ok: true;
   orderId: string;
   payment: PaymentBundle;
+  /** Total ya con cupón aplicado, para el evento del pixel. */
+  amount: number;
+  /** El mismo id con el que el servidor manda AddPaymentInfo, para deduplicar. */
+  metaEventId: string;
 };
 
 export type CheckoutActionResult = CheckoutSuccess | (CheckoutResult & { ok: false });
@@ -107,8 +118,20 @@ export async function submitCheckout(payload: CheckoutPayload): Promise<Checkout
     amount = subtotal - appliedCoupon.discount;
   }
 
+  // Las cookies del pixel, la IP y el user agent se leen aquí y se guardan con
+  // el pedido: el Purchase sale después desde el webhook de la pasarela, donde
+  // ya no hay navegador del cliente del que sacarlas. Se arma en el servidor a
+  // propósito — lo que venga en payload.tracking del cliente se descarta.
+  const requestHeaders = await headers();
+  const tracking = trackingFromHeaders(
+    requestHeaders,
+    requestHeaders.get("referer") ?? undefined,
+  );
+  const storedPayload: CheckoutPayload = { ...payload, tracking };
+
+  let order;
   try {
-    await orderStore.create({
+    order = await orderStore.create({
       id: orderId,
       status: "created",
       amount,
@@ -118,12 +141,16 @@ export async function submitCheckout(payload: CheckoutPayload): Promise<Checkout
       domainOwnership: payload.hosting.domainOwnership,
       legalFirstName: payload.invoice.legalFirstName,
       legalLastName: payload.invoice.legalLastName,
-      payload,
+      payload: storedPayload,
     });
   } catch (err) {
     console.error("[checkout] failed to persist order", err);
     return { ok: false, error: "No pudimos crear el pedido. Intenta de nuevo." };
   }
+
+  // "Agregar información de pago": llenó el formulario y va camino a la
+  // pasarela. Después de responder, para no demorarle el redirect.
+  after(() => trackAddPaymentInfo(order));
 
   try {
     let payment: PaymentBundle;
@@ -134,7 +161,13 @@ export async function submitCheckout(payload: CheckoutPayload): Promise<Checkout
       const built = buildPaymentForm(orderId, payload, amount);
       payment = { provider: "paymentsway", method: "POST", ...built };
     }
-    return { ok: true, orderId, payment };
+    return {
+      ok: true,
+      orderId,
+      payment,
+      amount,
+      metaEventId: addPaymentInfoEventId(orderId),
+    };
   } catch (err) {
     console.error("[checkout] failed to build payment form", err);
     return { ok: false, error: "No pudimos iniciar el pago. Intenta de nuevo." };
