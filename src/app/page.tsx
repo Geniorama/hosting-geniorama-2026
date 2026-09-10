@@ -2,6 +2,7 @@ import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { BrandShowcase } from "@/components/BrandShowcase";
 import { PlansSection } from "@/components/PlansSection";
+import { Testimonials } from "@/components/Testimonials";
 import { Advisor } from "@/components/Advisor";
 import { Features } from "@/components/Features";
 import { CompareSection } from "@/components/CompareSection";
@@ -17,6 +18,7 @@ export default function Home() {
         <Hero />
         <BrandShowcase />
         <PlansSection />
+        <Testimonials />
         <Advisor />
         <Features />
         <CompareSection />
