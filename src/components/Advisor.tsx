@@ -19,8 +19,8 @@ export function Advisor() {
             necesito?
           </h2>
           <p className="advisor-lead">
-            Descríbele tu proyecto a nuestro asesor de IA y te dice con cuál plan arrancar, por
-            qué ese y no otro, y qué te queda si creces.
+            No necesitas saber de GB ni de paneles. Describe tu proyecto en una
+            frase y te decimos con cuál plan arrancar.
           </p>
 
           <ol className="advisor-steps">
@@ -33,9 +33,13 @@ export function Advisor() {
           </ol>
 
           <p className="advisor-note">
-            Sugerencia automática sobre nuestro catálogo real, sin registro. Si tu caso es
-            especial,{" "}
-            <a href="https://app.geniorama.co" target="_blank" rel="noopener noreferrer">
+            Sugerencia automática sobre nuestro catálogo real, sin registro. Si
+            tu caso es especial,{" "}
+            <a
+              href="https://app.geniorama.co"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               lo revisamos contigo
             </a>
             .

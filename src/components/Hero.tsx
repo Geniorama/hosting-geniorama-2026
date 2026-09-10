@@ -1,9 +1,8 @@
-"use client"
+"use client";
 
 import Link from "next/link";
 
 export function Hero() {
-  const currentYear = new Date().getFullYear().toString();
 
   return (
     <section className="hero">
@@ -11,20 +10,20 @@ export function Hero() {
         <div className="hero-text">
           <span className="eyebrow">
             <span className="eyebrow-dot" />
-            Hosting profesional · {currentYear}
+            Elige tu plan de hosting en un minuto
           </span>
           <h1 className="display-title">
-            Tu sitio web,
+            El hosting que se ajusta a tu proyecto,
             <br />
-            <span className="accent">siempre online.</span>
+            <span className="accent">no al revés.</span>
           </h1>
           <p className="hero-subtitle">
-            Hosting SSD con cPanel, asistencia 24/7 y planes pensados para WordPress,
-            e-commerce y campañas publicitarias. Pesos colombianos, sin sorpresas.
+            Una landing por tres meses, una tienda por años o una página que
+            apenas empieza: describe tu proyecto y te decimos qué plan necesitas
           </p>
           <div className="hero-actions">
             <Link href="#planes" className="btn btn-primary btn-lg">
-              Elegir mi plan
+              Describir mi proyecto
               <svg
                 width="14"
                 height="14"
@@ -48,16 +47,16 @@ export function Hero() {
       <div className="container-page">
         <div className="hero-stats">
           <div className="hero-stat">
-            <div className="hero-stat-value">99.9%</div>
-            <div className="hero-stat-label">Uptime</div>
+            <div className="hero-stat-value">Mes o año</div>
+            <div className="hero-stat-label">Sin permanencia</div>
           </div>
           <div className="hero-stat">
-            <div className="hero-stat-value">SSD</div>
-            <div className="hero-stat-label">Almacenamiento rápido</div>
+            <div className="hero-stat-value">Mismo precio</div>
+            <div className="hero-stat-label">Al renovar</div>
           </div>
           <div className="hero-stat">
             <div className="hero-stat-value">24/7</div>
-            <div className="hero-stat-label">Soporte</div>
+            <div className="hero-stat-label">Soporte en Colombia</div>
           </div>
         </div>
       </div>
