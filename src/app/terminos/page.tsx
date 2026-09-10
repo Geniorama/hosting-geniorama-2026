@@ -6,6 +6,7 @@ export const metadata = {
   title: "Términos y condiciones — Hosting Geniorama",
   description:
     "Términos y condiciones de uso de los servicios de Hosting Geniorama: alcance, pagos, garantías, soporte y responsabilidades.",
+  alternates: { canonical: "/terminos" },
 };
 
 export default function TerminosPage() {

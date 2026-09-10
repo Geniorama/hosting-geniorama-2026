@@ -6,6 +6,7 @@ export const metadata = {
   title: "Política de privacidad — Hosting Geniorama",
   description:
     "Política de tratamiento de datos personales de Hosting Geniorama, conforme a la Ley 1581 de 2012 de Colombia.",
+  alternates: { canonical: "/privacidad" },
 };
 
 export default function PrivacidadPage() {
