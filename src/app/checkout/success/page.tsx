@@ -5,6 +5,7 @@ import { PurchaseTracker } from "@/components/PurchaseTracker";
 import { orderStore } from "@/lib/order-store";
 import { purchaseEventId } from "@/lib/meta-events";
 import { plans } from "@/lib/plans";
+import { whatsappLink } from "@/lib/contact";
 
 type SearchParams = Promise<{ order?: string; status?: string }>;
 
@@ -166,9 +167,9 @@ export default async function CheckoutSuccessPage({
                 </Link>
               )}
               <a
-                href={`https://wa.me/573000000000?text=${encodeURIComponent(
+                href={whatsappLink(
                   `Hola Geniorama, necesito ayuda con mi pedido ${orderId ?? ""}.`,
-                )}`}
+                )}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn btn-ghost btn-lg"

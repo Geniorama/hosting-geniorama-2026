@@ -1,3 +1,5 @@
+import { whatsappLink } from "@/lib/contact";
+
 export function CTA() {
   return (
     <section className="section-tight">
@@ -23,7 +25,7 @@ export function CTA() {
             }}
           >
             <a
-              href="https://wa.me/573000000000?text=Hola%20Geniorama%2C%20quiero%20asesor%C3%ADa%20sobre%20hosting."
+              href={whatsappLink("Hola Geniorama, quiero asesoría sobre hosting.")}
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-primary btn-lg"

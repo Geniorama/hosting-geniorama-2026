@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "./Logo";
+import { whatsappLink } from "@/lib/contact";
 
 export function Footer() {
   return (
@@ -39,7 +40,7 @@ export function Footer() {
                 <a href="mailto:hola@geniorama.co">hola@geniorama.co</a>
               </li>
               <li>
-                <a href="https://wa.me/573000000000" target="_blank" rel="noopener noreferrer">
+                <a href={whatsappLink()} target="_blank" rel="noopener noreferrer">
                   WhatsApp
                 </a>
               </li>
