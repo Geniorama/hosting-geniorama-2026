@@ -947,6 +947,77 @@ body {
   margin: 0;
 }
 
+/* ── GARANTÍA ──────────────────────────────────────── */
+.guarantee {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  max-width: 640px;
+  margin: 2.5rem auto 0;
+  padding: 1.25rem 1.5rem;
+  background: var(--color-card);
+  border: 1.5px solid var(--color-border);
+  border-radius: 16px;
+}
+
+.guarantee-icon {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  background: rgba(228, 18, 121, 0.1);
+  border: 1px solid rgba(228, 18, 121, 0.3);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-pink);
+}
+
+.guarantee-body {
+  min-width: 0;
+}
+
+.guarantee-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.005em;
+  margin: 0 0 0.3rem;
+}
+
+.guarantee-text {
+  font-size: 0.9rem;
+  color: var(--color-text-soft);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.guarantee-terms {
+  font-size: 0.75rem;
+  color: var(--color-text-soft);
+  opacity: 0.75;
+  margin: 0.5rem 0 0;
+}
+
+.guarantee-terms a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.guarantee-terms a:hover {
+  color: var(--color-pink);
+}
+
+@media (max-width: 480px) {
+  .guarantee {
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 1.1rem 1.2rem;
+  }
+}
+
 /* ── FAQ ────────────────────────────────────────────────── */
 .faq-list {
   max-width: 760px;
@@ -2106,6 +2177,10 @@ body {
 
 .legal-article section {
   margin-bottom: 2rem;
+}
+
+.legal-article section[id] {
+  scroll-margin-top: 6rem;
 }
 
 .legal-article h2 {

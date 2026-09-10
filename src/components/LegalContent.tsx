@@ -1,7 +1,7 @@
 export function TerminosContent() {
   return (
     <>
-      <p className="legal-updated">Última actualización: 5 de mayo de 2026</p>
+      <p className="legal-updated">Última actualización: 9 de septiembre de 2026</p>
 
       <section>
         <h2>1. Aceptación</h2>
@@ -41,13 +41,39 @@ export function TerminosContent() {
           período se paga por separado y Geniorama no almacena medios de pago. Antes del
           vencimiento enviamos avisos de renovación al correo registrado. Si el cliente no
           renueva, el servicio se suspende una vez terminado el período y el plazo de gracia
-          informado en dichos avisos. Los pagos correspondientes a períodos ya iniciados no
-          son reembolsables salvo que la legislación aplicable indique lo contrario.
+          informado en dichos avisos. Salvo lo previsto en la garantía de devolución del
+          numeral 5 y en lo que disponga la legislación aplicable, los pagos
+          correspondientes a períodos ya iniciados no son reembolsables.
+        </p>
+      </section>
+
+      <section id="garantia-devolucion">
+        <h2>5. Garantía de devolución</h2>
+        <p>
+          El cliente puede solicitar la devolución del valor pagado por su plan de hosting
+          dentro de los treinta (30) días calendario siguientes a la activación cuando la
+          contratación sea anual, o dentro de los siete (7) días calendario cuando sea
+          mensual. El plazo se cuenta desde la activación del primer período contratado.
+        </p>
+        <p>
+          La solicitud debe hacerse por los canales de soporte o escribiendo a{" "}
+          <a href="mailto:hola@geniorama.co">hola@geniorama.co</a> desde el correo
+          registrado en la cuenta. Una vez aprobada, el reembolso se realiza por el mismo
+          medio de pago utilizado, dentro de los quince (15) días hábiles siguientes, y la
+          cuenta de hosting se cancela junto con los datos alojados en ella.
+        </p>
+        <p>
+          La garantía aplica una sola vez por cliente y únicamente sobre el primer período
+          contratado de cada servicio: no cubre renovaciones, ni los servicios de terceros
+          adquiridos a través de Geniorama (dominios, certificados o licencias), cuyo valor
+          se descuenta del reembolso por tratarse de registros no reversibles. Tampoco
+          aplica cuando la cuenta ha sido suspendida o cancelada por incumplimiento del
+          numeral 7 (uso aceptable).
         </p>
       </section>
 
       <section>
-        <h2>5. Garantía de uptime</h2>
+        <h2>6. Garantía de uptime</h2>
         <p>
           Geniorama mantiene una disponibilidad objetivo del 99,9 % mensual sobre la
           infraestructura compartida. Las ventanas de mantenimiento programadas y las
@@ -56,7 +82,7 @@ export function TerminosContent() {
       </section>
 
       <section>
-        <h2>6. Uso aceptable</h2>
+        <h2>7. Uso aceptable</h2>
         <p>
           El cliente se compromete a no utilizar el servicio para alojar contenido
           ilegal, malware, phishing, spam, criptominería, distribución de material que
@@ -67,7 +93,7 @@ export function TerminosContent() {
       </section>
 
       <section>
-        <h2>7. Copias de seguridad</h2>
+        <h2>8. Copias de seguridad</h2>
         <p>
           Geniorama realiza copias de seguridad periódicas con fines operativos, pero
           recomendamos que el cliente conserve sus propias copias. La responsabilidad
@@ -76,7 +102,7 @@ export function TerminosContent() {
       </section>
 
       <section>
-        <h2>8. Soporte</h2>
+        <h2>9. Soporte</h2>
         <p>
           El soporte técnico se presta por correo, chat y WhatsApp en horario hábil
           colombiano, con disponibilidad 24/7 para incidentes críticos que afecten la
@@ -85,7 +111,7 @@ export function TerminosContent() {
       </section>
 
       <section>
-        <h2>9. Limitación de responsabilidad</h2>
+        <h2>10. Limitación de responsabilidad</h2>
         <p>
           Geniorama no será responsable por daños indirectos, lucro cesante o pérdida
           de datos derivados del uso o imposibilidad de uso del servicio. La
@@ -95,7 +121,7 @@ export function TerminosContent() {
       </section>
 
       <section>
-        <h2>10. Modificaciones</h2>
+        <h2>11. Modificaciones</h2>
         <p>
           Estos términos pueden actualizarse en cualquier momento. Los cambios se
           publicarán en esta misma página y aplicarán desde su fecha de publicación.
@@ -103,7 +129,7 @@ export function TerminosContent() {
       </section>
 
       <section>
-        <h2>11. Ley aplicable</h2>
+        <h2>12. Ley aplicable</h2>
         <p>
           Este contrato se rige por las leyes de la República de Colombia. Cualquier
           controversia se resolverá ante los jueces competentes de la ciudad de
@@ -112,7 +138,7 @@ export function TerminosContent() {
       </section>
 
       <section>
-        <h2>12. Contacto</h2>
+        <h2>13. Contacto</h2>
         <p>
           Para dudas sobre estos términos puedes escribir a{" "}
           <a href="mailto:hola@geniorama.co">hola@geniorama.co</a>.
