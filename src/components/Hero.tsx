@@ -1,9 +1,6 @@
-"use client";
-
 import Link from "next/link";
 
 export function Hero() {
-
   return (
     <section className="hero">
       <div className="container-page hero-grid">
@@ -19,7 +16,7 @@ export function Hero() {
           </h1>
           <p className="hero-subtitle">
             Una landing por tres meses, una tienda por años o una página que
-            apenas empieza: describe tu proyecto y te decimos qué plan necesitas
+            apenas empieza: describe tu proyecto y te decimos qué plan necesitas.
           </p>
           <div className="hero-actions">
             <Link href="#planes" className="btn btn-primary btn-lg">
