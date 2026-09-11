@@ -19,7 +19,7 @@ export function Hero() {
             apenas empieza: describe tu proyecto y te decimos qué plan necesitas.
           </p>
           <div className="hero-actions">
-            <Link href="#planes" className="btn btn-primary btn-lg">
+            <Link href="#asesor" className="btn btn-primary btn-lg">
               Describir mi proyecto
               <svg
                 width="14"
@@ -34,7 +34,7 @@ export function Hero() {
                 <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>
             </Link>
-            <Link href="#comparar" className="btn btn-ghost btn-lg">
+            <Link href="#planes" className="btn btn-ghost btn-lg">
               Comparar planes
             </Link>
           </div>
